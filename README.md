@@ -9,6 +9,23 @@ Routine reads and analysis run automatically. Consequential actions—sending a
 message or updating an operational record—require explicit host approval and
 are simulated only.
 
+## Current status
+
+StayOps AI V1 is implemented end to end. The current build includes the linked
+eight-property dataset, typed read tools, intent and date routing, conditional
+parallel specialists, operations synthesis, deterministic safety checks,
+LangGraph human review, approval-protected simulated writes, intent-aware
+answers, the polished Streamlit command center, and the evaluation harness.
+
+As of August 29, 2026:
+
+- all **207 automated tests pass**;
+- all **9 evaluation scenarios pass** and every aggregate target is met;
+- routing, specialist activation, priority/risk accuracy, approval enforcement,
+  and safe failure handling score `1.0` in the saved deterministic evaluation;
+- unsupported critical claims score `0`; and
+- external messages and production-system writes remain intentionally disabled.
+
 ## System architecture
 
 The application uses LangGraph for orchestration and LangChain runnables with
@@ -53,10 +70,17 @@ Six linked JSON fixtures live in `data/`:
 - `cleaning_schedule.json`
 - `maintenance_tickets.json`
 
+The fixtures currently contain 8 properties, 8 property-rule records, 21
+reservations, 17 guest messages, 16 cleaning jobs, and 14 maintenance tickets.
 Strict Pydantic models validate every record, and every fixture is explicitly
-marked as synthetic. The dashboard resolves relative calendar language against
-the current date in `America/Los_Angeles` (overridable with
-`STAYOPS_TIMEZONE`). Tests and evaluation scenarios inject a fixed reference
+marked as synthetic.
+
+The dashboard resolves calendar language against the current date in
+`America/Los_Angeles`, overridable with `STAYOPS_TIMEZONE`. It understands
+`today`, `tomorrow`, `yesterday`, day-before/day-after phrases, named weekdays,
+`this`/`next`/`last` weekday or weekend scopes, upcoming periods, and explicit
+ISO dates or ranges. The daily dashboard automatically refreshes after a local
+calendar-day rollover. Tests and evaluation scenarios inject a fixed reference
 date to remain deterministic.
 
 The dataset includes same-day turnovers, an unconfirmed cleaner, unanswered
@@ -163,7 +187,9 @@ If gate evaluation fails, the workflow defaults to requiring human review.
 
 When review is required, LangGraph `interrupt()` pauses the graph with a
 JSON-serializable payload containing proposed actions, evidence-linked
-findings, review reasons, and Approve, Edit, and Reject options.
+findings, review reasons, and supported Approve, Edit, and Reject decisions.
+The current host-facing dashboard intentionally exposes only Approve and Reject;
+the programmatic workflow retains Edit-and-reconfirm support.
 
 The graph uses an in-memory checkpointer by default. Callers resume the same
 thread with `Command(resume=...)`:
@@ -210,27 +236,49 @@ tokens are rejected. Every call produces a structured attempt record;
 successful simulations also produce an execution record. Reject creates no
 capability or write attempt.
 
-These functions do not mutate the JSON fixtures or call external services.
+Successful simulations are recorded under `data/runtime/` in separate outbound
+message, record-update, and action-history files. Read tools overlay those
+records on the immutable fixtures, so the approved result is visible in the UI:
+a guest message becomes answered, a cleaner reminder is recorded, or a
+maintenance status changes. Runtime files are ignored by Git. The simulation
+does not mutate source fixtures or call an external messaging, booking, or
+maintenance service.
 
 ## Response generation
 
 A typed response generator runs after safe completion, rejection, or approved
-execution. It combines the evidence-grounded operations briefing with the
-actual workflow outcome. It also reports execution failures instead of
-presenting an approval as a successful action.
+execution. It answers the routed question in its first sentence and formats only
+the operational fields relevant to the request:
+
+- arrivals include property, guest, check-in time, and guest count;
+- daily attention separates Needs Action from Watch items;
+- turnover answers include checkout, cleaning target, next check-in,
+  confirmation, and next step;
+- guest-message answers show urgency, concise content, and approval status;
+- maintenance answers show severity, guest impact, status, and next step; and
+- property-status answers directly say Ready, At Risk, or Needs Action.
+
+Secondary risks appear separately under `Heads up`. Dates and times are
+human-friendly, empty results are stated directly, and approval copy identifies
+the exact action waiting for review. The generator reports execution failures
+instead of presenting an approval as a successful action.
 
 ## Streamlit dashboard
 
 The root `app.py` provides:
 
-- Need attention, Watch, and Ready portfolio counts;
-- ranked priorities with supporting evidence;
+- Needs Action, Watch, Ready for Guests, and Arrivals Today portfolio counts;
+- prioritized attention cards with supporting evidence;
 - property cards and property drill-downs;
-- Messages, Cleanings, Maintenance, and Upcoming arrivals workspaces;
+- dedicated Guest Messages, Turnovers, Maintenance, and Arrivals workspaces;
 - property operating rules;
-- Ask StayOps queries against the same operations graph;
-- Approve, Edit and reconfirm, Reject, and acknowledgement controls; and
-- an optional debug view for specialist findings, run telemetry, and errors.
+- URL-backed sidebar navigation that opens the requested workspace;
+- Ask StayOps form and quick prompts against the same operations graph;
+- an intent-aware `✨ StayOps Answer` shown only after a user asks a question;
+- Approve & Send, Approve & Update, Reject, and failure-acknowledgement controls;
+  and
+- optional Agent Activity details for routing, specialists, synthesis, safety,
+  telemetry, and errors.
 
 One controller and checkpointer remain alive within each Streamlit session so
 an interrupted review resumes its original graph thread. Approval capability
@@ -247,7 +295,8 @@ runners, allowing structured-output model implementations to be added without
 changing the deterministic safety gate or approval controls.
 
 Checkpointing is in memory and supports pause/resume within the running
-application. Persistent checkpoint storage, cross-request operational memory,
+application. Simulated approved changes persist through the local runtime
+overlay, but persistent graph checkpoints, cross-request conversational memory,
 and a Mem0 memory layer are not currently configured.
 
 ## Installation
@@ -273,6 +322,10 @@ Run the complete automated test suite:
 uv run pytest
 ```
 
+The current suite contains 207 tests covering datasets, tools, date parsing,
+routing, specialist isolation, synthesis, safety, human review, protected
+writes, response formatting, evaluation contracts, and Streamlit interactions.
+
 Run the deterministic evaluation harness and refresh its saved reports:
 
 ```bash
@@ -292,18 +345,23 @@ critical claims. Saved outputs include:
 - per-scenario diagnostics under `evaluation/results/scenarios/`
 - `evaluation/results/aggregate_report.json`
 
-The command exits non-zero if an aggregate target is missed. Automated latency
-is not a substitute for human usability evidence; use
+The latest saved report records 9/9 passing scenarios with
+`all_targets_met=true`. The command exits non-zero if an aggregate target is
+missed. Automated latency is not a substitute for human usability evidence; use
 [`evaluation/usability_protocol.md`](evaluation/usability_protocol.md) to test
 whether a host can identify and act on important issues in under five minutes.
 
 ## Demo runbook
 
-1. Start the dashboard and ask, “Which guests are arriving at City Loft today?”
-   for the happy path.
-2. Return to the daily briefing, inspect the Lake House cleaner issue and its
-   evidence, then Approve, Edit, or Reject the proposed simulated action.
-3. Run `uv run python -m src.evaluation.runner` and inspect
+1. Start the dashboard and ask, “Which guests are arriving today?” for an
+   intent-aware arrivals answer. Try “tomorrow,” a weekday name, or “this
+   weekend” to demonstrate calendar routing.
+2. Inspect a proposed cleaner or maintenance action in Human Approvals, then
+   Approve or Reject it. An approval updates the local simulated runtime and the
+   corresponding UI records without contacting anyone.
+3. Enable Agent Activity to inspect routing, selected specialists, synthesis,
+   safety checks, latency, and structured errors.
+4. Run `uv run python -m src.evaluation.runner` and inspect
    `evaluation/results/scenarios/persistent_tool_failure.json` for the
    two-attempt failure, incomplete-analysis escalation, review pause, and zero
    executions.
