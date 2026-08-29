@@ -9,6 +9,7 @@ description = "A multi-agent short-term rental operations manager"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "langchain-core>=1.6,<2",
     "langgraph>=1.2,<2",
     "pydantic>=2.10,<3",
 ]

@@ -47,6 +47,17 @@ START -> request_router -> END
 
 No specialist agents or operational synthesis run in Phase 2.
 
+## Phase 3: specialist agents
+
+Booking, Guest, Turnover, and Maintenance specialists are independent
+LangChain runnables with Pydantic input and output schemas. They accept only
+supplied operational records and return evidence-linked findings, severities,
+recommended next actions, analyzed record IDs, and source-data warnings.
+
+The specialists are read-only analyzers: they cannot send messages, modify
+reservations, update tickets, or execute any other operational action. They are
+not connected to the LangGraph workflow until the parallel orchestration phase.
+
 Install and validate with:
 
 ```bash

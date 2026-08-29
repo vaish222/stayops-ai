@@ -1,5 +1,21 @@
 """Typed domain models for StayOps operational data."""
 
+from src.models.findings import (
+    AgentSourceError,
+    AgentWarning,
+    BookingAgentInput,
+    EvidenceSource,
+    FindingCategory,
+    FindingEvidence,
+    FindingSeverity,
+    GuestAgentInput,
+    MaintenanceAgentInput,
+    SpecialistFinding,
+    SpecialistInput,
+    SpecialistName,
+    SpecialistOutput,
+    TurnoverAgentInput,
+)
 from src.models.operations import (
     CleaningSchedule,
     CleaningStatus,
@@ -19,13 +35,22 @@ from src.models.operations import (
 )
 
 __all__ = [
+    "AgentSourceError",
+    "AgentWarning",
+    "BookingAgentInput",
     "CleaningSchedule",
     "CleaningStatus",
     "ConfirmationStatus",
+    "EvidenceSource",
+    "FindingCategory",
+    "FindingEvidence",
+    "FindingSeverity",
     "GuestMessage",
+    "GuestAgentInput",
     "MaintenanceSeverity",
     "MaintenanceStatus",
     "MaintenanceTicket",
+    "MaintenanceAgentInput",
     "MessageCategory",
     "MessageDirection",
     "MessageUrgency",
@@ -34,4 +59,9 @@ __all__ = [
     "Reservation",
     "ReservationStatus",
     "StayOpsDataset",
+    "SpecialistFinding",
+    "SpecialistInput",
+    "SpecialistName",
+    "SpecialistOutput",
+    "TurnoverAgentInput",
 ]
