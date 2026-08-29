@@ -1,22 +1,68 @@
 # StayOps AI
 
-StayOps AI helps a self-managing short-term-rental host operate eight
-fictional properties from one dashboard. It is being built phase by phase from
-the requirements in `product_requirements.md`.
+StayOps AI is a multi-agent operations assistant for a self-managing
+short-term-rental host. It coordinates booking, guest communication, turnover,
+and maintenance analysis across eight fictional properties and presents one
+prioritized Streamlit dashboard.
 
-## Phase 0: synthetic operations dataset
+Routine reads and analysis run automatically. Consequential actions—sending a
+message or updating an operational record—require explicit host approval and
+are simulated only.
 
-Phase 0 provides six linked JSON fixtures in `data/` and strict Pydantic domain
-models in `src/models/`. Every record is explicitly marked as synthetic. The
-fixtures use **2026-08-28** as their fixed operating date so scenarios and
-future evaluations remain deterministic.
+## System architecture
 
-The data includes same-day turnovers, an unconfirmed cleaner, unanswered guest
-messages, guest-impacting and non-blocking maintenance, an early check-in
+The application uses LangGraph for orchestration and LangChain runnables with
+Pydantic contracts for validated component boundaries.
+
+```text
+Host request
+    |
+Request router
+    |
+Context loader
+    |
+    +--> Booking specialist --------+
+    +--> Guest specialist ----------+
+    +--> Turnover specialist -------+--> Operations synthesizer
+    +--> Maintenance specialist ----+             |
+                                              Risk/action gate
+                                                /          \
+                                        Safe response    Human review
+                                                           /   |   \
+                                                     Approve  Edit  Reject
+                                                        |             |
+                                                Protected executor    |
+                                                        \             /
+                                                   Response generator
+```
+
+The graph loads only the sources required by the routed intent. Broad briefing
+and risk requests run all four specialists concurrently, while domain-specific
+requests use the smallest useful specialist set. Every completed path converges
+on the response generator so the host-facing narrative reflects the actual
+review and execution outcome.
+
+## Synthetic operational data
+
+Six linked JSON fixtures live in `data/`:
+
+- `properties.json`
+- `property_rules.json`
+- `reservations.json`
+- `guest_messages.json`
+- `cleaning_schedule.json`
+- `maintenance_tickets.json`
+
+Strict Pydantic models validate every record, and every fixture is explicitly
+marked as synthetic. The fixed operating date is **2026-08-28**, keeping tests
+and evaluation scenarios deterministic.
+
+The dataset includes same-day turnovers, an unconfirmed cleaner, unanswered
+guest messages, guest-impacting and non-blocking maintenance, an early check-in
 request, future arrivals, vacant properties, and routine properties that need
 no attention.
 
-## Phase 1: read tools
+## Read tools and context loading
 
 The `src/tools/` package exposes six read-only functions:
 
@@ -27,98 +73,98 @@ The `src/tools/` package exposes six read-only functions:
 - `get_cleaning_schedule()`
 - `get_maintenance_tickets()`
 
-Each function returns a typed `ReadResult` instead of throwing operational data
-errors. Tools support property filtering, and dated records support inclusive
-date filtering. `FailureSimulator` can deterministically fail the first N calls
-to any tool so retry and recovery behavior can be tested without randomness.
+Each function returns a typed `ReadResult` instead of raising operational data
+errors. Tools support property filtering, while dated sources support inclusive
+date filtering.
 
-## Phase 2: state and request routing
+The context loader retries retryable failures once. A persistent failure:
 
-`StayOpsState` defines the complete typed workflow state and is initialized by
-`create_initial_state()`. The Pydantic request router extracts an operational
-intent, canonical property IDs, an ISO date or date range, and whether the host
-is asking for a write action. Relative dates use an injectable reference date
-for deterministic tests.
+- records a structured workflow error;
+- marks `analysis_complete=False`;
+- identifies the source in `unavailable_sources`;
+- prevents findings from being fabricated from unavailable data; and
+- triggers human review when the analysis cannot be considered complete.
 
-The current LangGraph is intentionally limited to:
+`FailureSimulator` provides deterministic first-N-call failures for testing
+these recovery paths without randomness.
 
-```text
-START -> request_router -> END
-```
+## Request routing and shared state
 
-No specialist agents or operational synthesis run in Phase 2.
+`StayOpsState` contains the complete typed workflow state and is initialized by
+`create_initial_state()`. The request router extracts:
 
-## Phase 3: specialist agents
+- operational intent;
+- canonical property IDs;
+- an ISO date or date range; and
+- whether the request could produce a write.
 
-Booking, Guest, Turnover, and Maintenance specialists are independent
-LangChain runnables with Pydantic input and output schemas. They accept only
-supplied operational records and return evidence-linked findings, severities,
-recommended next actions, analyzed record IDs, and source-data warnings.
+Relative dates use an injectable reference date for deterministic tests. The
+state retains loaded context, specialist findings, priorities, proposed
+actions, risk decisions, human decisions, write attempts, simulated
+executions, errors, run telemetry, and the final response.
 
-The specialists are read-only analyzers: they cannot send messages, modify
-reservations, update tickets, or execute any other operational action. They are
-not connected to the LangGraph workflow until the parallel orchestration phase.
+## Specialist analysis
 
-## Phase 4: parallel LangGraph workflow
+Booking, Guest, Turnover, and Maintenance specialists are independent typed
+LangChain runnables. They accept only supplied operational records and return
+evidence-linked findings with severities, recommended next actions, analyzed
+record IDs, confidence, and source-data warnings.
 
-The Phase 4 graph routes each request, loads only the required read context,
-and conditionally fans out to the relevant specialists. Broad briefing and risk
-queries run all four specialists concurrently; domain queries run the smallest
-useful specialist set.
+The specialists are read-only:
 
-Property rules are loaded for turnover analysis. The turnover specialist uses
-the property's cleaner-ready buffer when comparing a cleaning target with the
-next arrival, and cites the exact rule record as evidence.
+- **Booking** identifies arrivals, departures, occupancy, booking gaps,
+  conflicts, and same-day turnovers.
+- **Guest** identifies unanswered messages, complaints, early check-in requests,
+  and guest-reported maintenance issues.
+- **Turnover** evaluates cleaning schedules, assignments, confirmations, and
+  timing against the next arrival. Property-specific cleaner-ready buffers are
+  included in the analysis and cited as evidence.
+- **Maintenance** evaluates open issues, severity, current guest impact, and
+  upcoming reservation impact.
 
-Retryable read failures are retried once. Persistent source failures become
-structured workflow errors without fabricated findings and set
-`analysis_complete=False` with the exact names in `unavailable_sources`, while
-an exception in one specialist branch is caught so its parallel peers can still
-complete. Each run records the agents selected, status, latency, finding count,
-warning count, and analyzed-record count. Specialist outputs merge into their
-dedicated `StayOpsState` fields. Synthesis and human review are not part of this
-phase.
+An exception in one specialist branch is isolated so its parallel peers can
+still finish. Each branch records status, latency, finding count, warning count,
+and analyzed-record count.
 
-## Phase 5: operations synthesis
+## Operations synthesis
 
-After all selected specialist branches finish, one deferred Operations
-Synthesizer receives only their structured findings. It preserves source
-evidence, combines explicitly related cross-agent findings, assigns stable
-priority ranks, derives an overall status, identifies affected properties, and
-records recommended actions as unexecuted proposals.
+After the selected specialists finish, the Operations Synthesizer receives only
+their structured findings. It:
 
-The cross-agent combination requires shared record evidence. For example, Lake
-House's same-day booking turnover and missing cleaner confirmation combine
-because both cite the same reservations. Same-property findings with unrelated
-evidence remain separate. Risk gating, approval, and action execution are not
-implemented in Phase 5.
+- preserves record-level evidence;
+- combines explicitly related cross-specialist findings;
+- assigns stable priority ranks;
+- derives overall operational status;
+- identifies affected properties; and
+- creates unexecuted action proposals.
 
-## Phase 6: deterministic risk and action gate
+Cross-specialist findings are combined only when they share supporting record
+evidence. Same-property findings with unrelated evidence remain separate.
 
-After synthesis, a pure-Python gate evaluates only structured findings, typed
-action proposals, and the router's write-intent flag. It sets
-`requires_human_review` and records explicit, evidence-linked reasons for:
+## Deterministic risk and action gate
 
-- message sends, reservation modifications, and record updates;
+A pure-Python gate evaluates structured findings, typed action proposals, and
+the router's write-intent flag. It records explicit reasons for human review
+when it detects:
+
+- message sends, reservation modifications, or record updates;
 - high- or critical-severity maintenance findings;
-- confidence below the configurable `0.75` default threshold;
+- confidence below the configurable `0.75` threshold;
 - contradictory turnover findings about the same property and source record;
-- required source data that remains unavailable after its retry;
-- any request the router classifies as potentially write-producing.
+- required source data that remains unavailable after retry; or
+- a request classified as potentially write-producing.
 
 Drafts and read-only review proposals remain safe unless another rule applies.
-If gate evaluation fails, the workflow defaults to requiring review. Phase 6
-stops after this decision: it does not pause for a person or execute any action.
+If gate evaluation fails, the workflow defaults to requiring human review.
 
-## Phase 7: checkpointed human review
+## Human review
 
-`build_phase_7_graph()` adds a LangGraph `interrupt()` only when the Phase 6
-gate requires review. The JSON-serializable interrupt payload contains the
-proposed actions, prioritized findings with evidence, explicit review reasons,
-and the available Approve, Edit, and Reject decisions.
+When review is required, LangGraph `interrupt()` pauses the graph with a
+JSON-serializable payload containing proposed actions, evidence-linked
+findings, review reasons, and Approve, Edit, and Reject options.
 
-The graph uses an in-memory checkpointer by default. Callers provide a stable
-thread ID and resume that same thread with `Command(resume=...)`:
+The graph uses an in-memory checkpointer by default. Callers resume the same
+thread with `Command(resume=...)`:
 
 ```python
 from langgraph.types import Command
@@ -138,138 +184,124 @@ completed = graph.invoke(
 )
 ```
 
-Approve and Reject complete the review. A source-failure review with no action
-can be acknowledged or rejected and never reaches a write tool. Edit can change only a selected
+Approve and Reject complete the review. Edit changes only the selected
 proposal's description, preserves its type and evidence links, and pauses again
 for reconfirmation. Invalid responses remain interrupted with a validation
-message. Phase 7 records decisions but contains no write tools or action
-execution nodes; those remain reserved for Phase 8.
+message. A source-failure review with no proposed action can be acknowledged or
+rejected and never reaches a write tool.
 
-## Phase 8: approval-protected simulated writes
+## Approval-protected simulated writes
 
-`build_phase_8_graph()` extends the checkpointed review workflow with three
-simulated write tools:
+The protected executor supports:
 
-- `send_guest_message()` replies to an evidence-linked guest message;
-- `send_cleaner_message()` contacts the cleaner for an evidence-linked job;
-- `update_maintenance_status()` records the exact reviewed status change.
+- `send_guest_message()`
+- `send_cleaner_message()`
+- `update_maintenance_status()`
 
-Each executable proposal includes its tool, target record, and exact parameters
-in the human-review payload. After an Approve decision, the workflow issues a
-one-time capability bound to the request ID, action ID, tool, target, content,
-and complete action fingerprint. Each tool independently validates and consumes
-that capability. Missing, invalid, replayed, cross-tool, cross-request, or
-content-mismatched tokens are rejected.
+An approved executable proposal contains its exact tool, target, and
+parameters. The workflow then issues a one-time capability bound to the request
+ID, action ID, tool, target, content, and complete action fingerprint. Each
+write function independently validates and consumes that capability.
 
-Every tool call returns a structured attempt record, including rejected calls.
-The graph stores these in `action_attempts`, stores successful simulations in
-`executed_actions`, and retains issued capabilities in `approval_grants` for
-auditability. Reject creates no capability or write attempt. Edit updates the
-displayed proposal and executable message together, then requires
-reconfirmation before a new capability can be issued.
+Missing, invalid, replayed, cross-tool, cross-request, and content-mismatched
+tokens are rejected. Every call produces a structured attempt record;
+successful simulations also produce an execution record. Reject creates no
+capability or write attempt.
 
-These tools are simulations only and do not mutate the JSON fixtures or call an
-external service. Phase 8 does not add a dashboard or any Phase 9 behavior.
+These functions do not mutate the JSON fixtures or call external services.
 
-The complete Phase 8 graph converges safe requests, rejected reviews, and
-approved execution paths on a typed response generator. It combines the
-evidence-grounded synthesis briefing with the actual review/execution outcome,
-so a pre-approval narrative cannot incorrectly claim that an action ran.
+## Response generation
 
-## Phase 9: Streamlit operations dashboard
+A typed response generator runs after safe completion, rejection, or approved
+execution. It combines the evidence-grounded operations briefing with the
+actual workflow outcome. It also reports execution failures instead of
+presenting an approval as a successful action.
 
-The root `app.py` provides the StayOps dashboard for all eight synthetic
-properties. It displays daily Need attention, Watch, and Ready counts; ranked
-issues with source evidence; portfolio cards; dedicated Messages, Cleanings,
-Maintenance, and Upcoming arrivals workspaces; and property drill-downs for
-stays, operations, and property rules.
+## Streamlit dashboard
 
-Ask StayOps submits operational questions to the same Phase 8 LangGraph—not a
-separate UI-only workflow. One controller and checkpointer are retained in each
-Streamlit session, so interrupted actions resume the same thread. The approval
-panel exposes the reviewed action and supporting evidence with Approve, Edit &
-reconfirm, and Reject controls. Successful approvals show only the resulting
-simulated execution record.
+The root `app.py` provides:
 
-A sidebar toggle reveals the four specialists' structured findings, run logs,
-and workflow errors for debugging. Approval capability values are intentionally
-excluded from this view. The dashboard uses the fixed synthetic operating date
-`2026-08-28`.
+- Need attention, Watch, and Ready portfolio counts;
+- ranked priorities with supporting evidence;
+- property cards and property drill-downs;
+- Messages, Cleanings, Maintenance, and Upcoming arrivals workspaces;
+- property operating rules;
+- Ask StayOps queries against the same operations graph;
+- Approve, Edit and reconfirm, Reject, and acknowledgement controls; and
+- an optional debug view for specialist findings, run telemetry, and errors.
 
-If a required read source remains unavailable, the dashboard shows an
-incomplete-analysis warning outside debug mode, explains that findings are
-partial, and never presents an unverified property as Ready.
+One controller and checkpointer remain alive within each Streamlit session so
+an interrupted review resumes its original graph thread. Approval capability
+values are intentionally excluded from the debug display.
 
-## Architecture alignment
+When a required source remains unavailable, the dashboard prominently labels
+the analysis as incomplete and never presents an unverified property as Ready.
 
-The workflow now implements the non-memory data and control-flow boundaries in
-`architecture.md`: six read sources feed scoped context, four specialists fan
-out in parallel, synthesis precedes a deterministic risk gate, risky paths
-pause for human review, approved writes pass through the protected executor,
-and every terminal path reaches the response generator. The Streamlit surface
-provides the portfolio and dedicated operational views shown in the diagram.
+## Current implementation boundaries
 
-The default router, specialists, synthesizer, and response generator are
-deterministic typed LangChain runnables so local tests and the synthetic demo do
-not require model credentials. Their graph boundaries accept injected runners,
-allowing a chosen structured-output model implementation to replace them
-without changing orchestration or safety controls. No persistent checkpoint or
-Mem0 memory layer is added here; that work is intentionally deferred.
+The router, specialists, synthesizer, and response generator currently use
+deterministic typed LangChain runnables. Their graph boundaries accept injected
+runners, allowing structured-output model implementations to be added without
+changing the deterministic safety gate or approval controls.
 
-Run the dashboard locally with:
+Checkpointing is in memory and supports pause/resume within the running
+application. Persistent checkpoint storage, cross-request operational memory,
+and a Mem0 memory layer are not currently configured.
+
+## Installation
+
+This project requires Python 3.12 or newer and uses `uv` for dependency
+management.
+
+```bash
+uv sync --all-groups
+```
+
+## Run the dashboard
 
 ```bash
 uv run streamlit run app.py
 ```
 
-Install and validate with:
+## Tests and evaluation
+
+Run the complete automated test suite:
 
 ```bash
-uv sync --all-groups
 uv run pytest
 ```
 
-## Phase 10: failure recovery and evaluation
-
-The final phase adds a deterministic evaluation harness over the same Phase 8
-LangGraph backend. The validated scenario dataset covers routine operations,
-same-day turnover, missing cleaner confirmation, a guest maintenance complaint,
-conflicting specialist findings, transient and persistent read-tool failures,
-an attempted write without approval, and a successful explicitly approved
-write.
-
-Each scenario records routing, specialist activation, status/risk behavior,
-approval enforcement, safe failure recovery, end-to-end latency, and any
-critical operational claims whose cited records are absent from loaded context.
-Persistent-failure grading requires exactly two attempts, explicit incomplete
-state, a source-unavailable review reason, a host-facing warning, no claim based
-on the missing source, and no write execution.
-Metrics are aggregated against the product requirements without lowering their
-thresholds. The five-minute target is reported as automated workflow latency;
-it is a proxy and not a human usability study. Use the
-[`evaluation/usability_protocol.md`](evaluation/usability_protocol.md) runbook
-to collect the human timing evidence separately.
-
-Run the suite and refresh the saved JSON reports with:
+Run the deterministic evaluation harness and refresh its saved reports:
 
 ```bash
 uv run python -m src.evaluation.runner
 ```
 
-Outputs are saved as `evaluation/results/scenario_results.json`, one diagnostic
-file per scenario under `evaluation/results/scenarios/`, and
-`evaluation/results/aggregate_report.json`. The command exits non-zero if an
-aggregate target is missed.
+The evaluation scenarios cover routine operations, same-day turnover, missing
+cleaner confirmation, a guest maintenance complaint, conflicting findings,
+transient and persistent read failures, an attempted write without approval,
+and an explicitly approved write.
 
-## Definition-of-done demo
+Metrics include routing accuracy, specialist activation, priority/risk
+accuracy, approval enforcement, safe failure recovery, latency, and unsupported
+critical claims. Saved outputs include:
 
-Use this short runbook to cover the required demo paths:
+- `evaluation/results/scenario_results.json`
+- per-scenario diagnostics under `evaluation/results/scenarios/`
+- `evaluation/results/aggregate_report.json`
 
-1. Start the dashboard and ask, “Which guests are arriving at City Loft
-   today?” for the happy path.
+The command exits non-zero if an aggregate target is missed. Automated latency
+is not a substitute for human usability evidence; use
+[`evaluation/usability_protocol.md`](evaluation/usability_protocol.md) to test
+whether a host can identify and act on important issues in under five minutes.
+
+## Demo runbook
+
+1. Start the dashboard and ask, “Which guests are arriving at City Loft today?”
+   for the happy path.
 2. Return to the daily briefing, inspect the Lake House cleaner issue and its
    evidence, then Approve, Edit, or Reject the proposed simulated action.
 3. Run `uv run python -m src.evaluation.runner` and inspect
    `evaluation/results/scenarios/persistent_tool_failure.json` for the
-   two-attempt tool failure, incomplete-analysis escalation, review pause, and
-   zero executions.
+   two-attempt failure, incomplete-analysis escalation, review pause, and zero
+   executions.
