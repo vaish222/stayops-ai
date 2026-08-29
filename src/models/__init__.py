@@ -46,6 +46,7 @@ from src.models.risk import (
     RiskGateInput,
     RiskGateOutput,
 )
+from src.models.response import ResponseGenerationInput, ResponseGenerationOutput
 from src.models.synthesis import (
     ActionType,
     OperationsSynthesisInput,
@@ -100,6 +101,8 @@ __all__ = [
     "ProposedAction",
     "Reservation",
     "ReservationStatus",
+    "ResponseGenerationInput",
+    "ResponseGenerationOutput",
     "ReviewReasonCode",
     "ReviewDecision",
     "RiskGateConfig",

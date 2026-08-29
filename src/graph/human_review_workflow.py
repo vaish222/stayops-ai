@@ -153,6 +153,7 @@ def _create_phase_7_graph_builder(
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
     gate_runner: GateRunner | None = None,
+    completion_target: str = END,
 ) -> StateGraph:
     """Build Phase 7 through human review, without its completion routes."""
 
@@ -169,7 +170,7 @@ def _create_phase_7_graph_builder(
     graph_builder.add_conditional_edges(
         "risk_action_gate",
         _route_after_risk_gate,
-        {"review": "human_review", "complete": END},
+        {"review": "human_review", "complete": completion_target},
     )
     return graph_builder
 

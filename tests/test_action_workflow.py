@@ -81,6 +81,8 @@ def test_approved_action_executes_only_its_matching_simulated_tool(
     assert completed["executed_actions"][0]["tool_name"] == tool_name
     assert completed["executed_actions"][0]["target_record_id"] == target_record_id
     assert completed["executed_actions"][0]["simulated"] is True
+    assert completed["response_generated"] is True
+    assert "1 simulated action executed" in completed["final_response"]
 
 
 def test_rejected_action_produces_no_token_attempt_or_execution() -> None:
@@ -101,6 +103,8 @@ def test_rejected_action_produces_no_token_attempt_or_execution() -> None:
     assert completed["approval_grants"] == []
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []
+    assert completed["response_generated"] is True
+    assert "rejected" in completed["final_response"].lower()
 
 
 def test_approving_non_executable_review_records_no_write_attempt() -> None:
@@ -128,6 +132,7 @@ def test_approving_non_executable_review_records_no_write_attempt() -> None:
     assert completed["approval_grants"] == []
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []
+    assert completed["response_generated"] is True
 
 
 def test_edited_message_requires_reconfirmation_and_executes_exact_edit() -> None:
@@ -195,6 +200,8 @@ def test_safe_read_path_never_reaches_write_execution() -> None:
     assert completed["approval_grants"] == []
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []
+    assert completed["response_generated"] is True
+    assert "No human approval was required" in completed["final_response"]
 
 
 def test_source_failure_review_can_be_acknowledged_without_a_write() -> None:
@@ -227,6 +234,7 @@ def test_source_failure_review_can_be_acknowledged_without_a_write() -> None:
     assert completed["approval_grants"] == []
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []
+    assert completed["response_generated"] is True
 
 
 def test_phase_8_adds_execution_without_ui_or_external_write_nodes() -> None:
@@ -235,4 +243,5 @@ def test_phase_8_adds_execution_without_ui_or_external_write_nodes() -> None:
 
     assert "human_review" in node_names
     assert "execute_approved_actions" in node_names
+    assert "response_generator" in node_names
     assert not {"streamlit_ui", "dashboard", "external_api_write"} & node_names

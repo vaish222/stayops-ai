@@ -1,6 +1,6 @@
 {
   "reference_date": "2026-08-28",
-  "generated_at": "2026-08-29T05:16:50.428882Z",
+  "generated_at": "2026-08-29T06:01:43.212649Z",
   "scenario_count": 9,
   "passed_scenarios": 9,
   "all_targets_met": true,
@@ -69,7 +69,7 @@
       "metric": "latency",
       "eligible_scenarios": 9,
       "passed_scenarios": 9,
-      "value": 7.209,
+      "value": 6.289,
       "unit": "milliseconds",
       "comparison": "maximum",
       "target": 300000.0,
@@ -77,9 +77,9 @@
     }
   ],
   "latency_summary_ms": {
-    "minimum": 0.037,
-    "median": 3.795,
-    "maximum": 7.209,
+    "minimum": 0.043,
+    "median": 2.948,
+    "maximum": 6.289,
     "target": 300000.0
   },
   "notes": [

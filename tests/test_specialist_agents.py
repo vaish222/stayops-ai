@@ -25,6 +25,7 @@ from src.tools import (
     get_cleaning_schedule,
     get_guest_messages,
     get_maintenance_tickets,
+    get_property_rules,
     get_reservations,
 )
 
@@ -176,6 +177,7 @@ def test_turnover_agent_escalates_missing_same_day_confirmation() -> None:
 def test_turnover_agent_reports_confirmed_city_cleaning_without_overclaiming_readiness() -> None:
     reservations = items(get_reservations(["prop_city_loft"]))
     cleanings = items(get_cleaning_schedule(["prop_city_loft"]))
+    rules = items(get_property_rules(["prop_city_loft"]))
 
     output = TurnoverAgent().invoke(
         TurnoverAgentInput(
@@ -183,6 +185,7 @@ def test_turnover_agent_reports_confirmed_city_cleaning_without_overclaiming_rea
             date_scope="2026-08-28",
             reservations=reservations,
             cleaning_schedule=cleanings,
+            property_rules=rules,
         )
     )
 
@@ -191,6 +194,33 @@ def test_turnover_agent_reports_confirmed_city_cleaning_without_overclaiming_rea
     assert on_track.requires_attention is False
     assert "cleaning is confirmed" in on_track.summary.lower()
     assert "property is ready" not in on_track.summary.lower()
+    assert any(
+        evidence.source == EvidenceSource.PROPERTY_RULES
+        for evidence in on_track.evidence
+    )
+
+
+def test_turnover_agent_applies_property_cleaner_ready_buffer() -> None:
+    reservations = items(get_reservations(["prop_city_loft"]))
+    cleaning = items(get_cleaning_schedule(["prop_city_loft"]))[0]
+    rules = items(get_property_rules(["prop_city_loft"]))
+    late_for_buffer = cleaning.model_copy(update={"target_complete_time": time(14, 0)})
+
+    output = TurnoverAgent().invoke(
+        TurnoverAgentInput(
+            property_scope=["prop_city_loft"],
+            date_scope="2026-08-28",
+            reservations=reservations,
+            cleaning_schedule=[late_for_buffer],
+            property_rules=rules,
+        )
+    )
+
+    timing = finding_by_category(output, FindingCategory.TURNOVER_TIMING_RISK)
+    evidence_by_source = {evidence.source: evidence for evidence in timing.evidence}
+    assert evidence_by_source[EvidenceSource.PROPERTY_RULES].record_ids == [
+        "rule_city_loft"
+    ]
 
 
 def test_turnover_agent_detects_timing_risk_and_missing_schedule() -> None:

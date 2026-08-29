@@ -3,7 +3,7 @@
   "name": "Persistent guest-message failure escalates safely",
   "category": "tool_failure",
   "passed": true,
-  "latency_ms": 3.24,
+  "latency_ms": 2.511,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -120,7 +120,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 3.24
+        "latency_ms": 2.511
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -154,6 +154,7 @@
       "get_guest_messages"
     ],
     "final_response": "Analysis incomplete: guest messages remained unavailable after retry. Findings are partial; absence of findings is not an all-clear.\n\nNo structured specialist findings were supplied.",
+    "response_generated": false,
     "finding_categories": [],
     "requires_human_review": true,
     "review_reason_codes": [
@@ -163,7 +164,7 @@
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.112,
+        "latency_ms": 0.094,
         "finding_count": 0,
         "warning_count": 1,
         "analyzed_record_count": 0,

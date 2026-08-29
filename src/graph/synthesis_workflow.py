@@ -83,6 +83,8 @@ def operations_synthesizer_node(
             "operational_findings": [],
             "priority_items": [],
             "proposed_actions": [],
+            "synthesis_briefing": response,
+            "response_generated": False,
             "final_response": response,
             "errors": [error],
         }
@@ -108,6 +110,8 @@ def operations_synthesizer_node(
         "proposed_actions": [
             action.model_dump(mode="json") for action in output.proposed_actions
         ],
+        "synthesis_briefing": response,
+        "response_generated": False,
         "final_response": response,
     }
 

@@ -58,6 +58,7 @@ READ_TOOL_EVIDENCE_SOURCES = {
     ReadToolName.GET_GUEST_MESSAGES: EvidenceSource.GUEST_MESSAGES,
     ReadToolName.GET_CLEANING_SCHEDULE: EvidenceSource.CLEANING_SCHEDULE,
     ReadToolName.GET_MAINTENANCE_TICKETS: EvidenceSource.MAINTENANCE_TICKETS,
+    ReadToolName.GET_PROPERTY_RULES: EvidenceSource.PROPERTY_RULES,
 }
 
 
@@ -163,6 +164,7 @@ def _unsupported_critical_claims(state: dict[str, Any]) -> list[dict[str, Any]]:
         EvidenceSource.GUEST_MESSAGES.value: state["guest_message_context"],
         EvidenceSource.CLEANING_SCHEDULE.value: state["cleaning_context"],
         EvidenceSource.MAINTENANCE_TICKETS.value: state["maintenance_context"],
+        EvidenceSource.PROPERTY_RULES.value: state.get("property_rule_context", {}),
     }
     unsupported: list[dict[str, Any]] = []
     finding_fields = (
@@ -513,6 +515,7 @@ def _run_workflow_scenario(
         "analysis_complete": state["analysis_complete"],
         "unavailable_sources": state["unavailable_sources"],
         "final_response": state["final_response"],
+        "response_generated": state["response_generated"],
         "finding_categories": sorted(
             {
                 category

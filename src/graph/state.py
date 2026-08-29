@@ -24,6 +24,7 @@ class WorkflowError(TypedDict, total=False):
         "synthesis_execution",
         "risk_gate_execution",
         "action_execution",
+        "response_generation",
     ]
     code: str
     message: str
@@ -43,6 +44,7 @@ class StayOpsState(TypedDict):
     write_requested: bool
     selected_specialists: list[str]
     property_context: dict[str, dict[str, Any]]
+    property_rule_context: dict[str, dict[str, Any]]
     reservation_context: dict[str, dict[str, Any]]
     guest_message_context: dict[str, dict[str, Any]]
     cleaning_context: dict[str, dict[str, Any]]
@@ -65,6 +67,8 @@ class StayOpsState(TypedDict):
     approval_grants: list[dict[str, Any]]
     action_attempts: list[dict[str, Any]]
     executed_actions: list[dict[str, Any]]
+    synthesis_briefing: str
+    response_generated: bool
     agent_runs: Annotated[list[AgentRunLog], operator.add]
     errors: Annotated[list[WorkflowError], operator.add]
     final_response: str
@@ -82,6 +86,7 @@ def create_initial_state(host_query: str, request_id: str | None = None) -> Stay
         write_requested=False,
         selected_specialists=[],
         property_context={},
+        property_rule_context={},
         reservation_context={},
         guest_message_context={},
         cleaning_context={},
@@ -104,6 +109,8 @@ def create_initial_state(host_query: str, request_id: str | None = None) -> Stay
         approval_grants=[],
         action_attempts=[],
         executed_actions=[],
+        synthesis_briefing="",
+        response_generated=False,
         agent_runs=[],
         errors=[],
         final_response="",

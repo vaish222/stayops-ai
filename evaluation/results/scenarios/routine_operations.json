@@ -3,7 +3,7 @@
   "name": "Routine property has no actionable findings",
   "category": "routine_operations",
   "passed": true,
-  "latency_ms": 7.209,
+  "latency_ms": 6.289,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -96,7 +96,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 7.209
+        "latency_ms": 6.289
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -132,7 +132,8 @@
     "overall_status": "no_findings",
     "analysis_complete": true,
     "unavailable_sources": [],
-    "final_response": "No structured specialist findings were supplied.",
+    "final_response": "No structured specialist findings were supplied.\n\nNo human approval was required and no simulated action was executed.",
+    "response_generated": true,
     "finding_categories": [],
     "requires_human_review": false,
     "review_reason_codes": [],
@@ -140,7 +141,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.164,
+        "latency_ms": 0.137,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -149,7 +150,7 @@
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.086,
+        "latency_ms": 0.091,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -158,7 +159,7 @@
       {
         "agent": "maintenance",
         "status": "succeeded",
-        "latency_ms": 0.097,
+        "latency_ms": 0.081,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -167,10 +168,10 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.117,
+        "latency_ms": 0.123,
         "finding_count": 0,
         "warning_count": 0,
-        "analyzed_record_count": 0,
+        "analyzed_record_count": 1,
         "error": null
       }
     ],

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from src.agents.base import BaseSpecialistAgent, date_in_scope, property_in_scope
 from src.models import (
@@ -15,6 +15,7 @@ from src.models import (
     FindingSeverity,
     Reservation,
     ReservationStatus,
+    PropertyRule,
     SpecialistFinding,
     SpecialistName,
     SpecialistOutput,
@@ -51,6 +52,9 @@ class TurnoverAgent(BaseSpecialistAgent[TurnoverAgentInput]):
             else []
         )
         reservations_by_id = {reservation.id: reservation for reservation in reservations}
+        rules_by_property = {
+            rule.property_id: rule for rule in context.property_rules
+        }
         findings: list[SpecialistFinding] = []
 
         for cleaning in cleanings:
@@ -64,6 +68,7 @@ class TurnoverAgent(BaseSpecialistAgent[TurnoverAgentInput]):
                 if cleaning.checkout_reservation_id
                 else None
             )
+            property_rule = rules_by_property.get(cleaning.property_id)
             schedule_evidence = FindingEvidence(
                 source=EvidenceSource.CLEANING_SCHEDULE,
                 record_ids=[cleaning.id],
@@ -154,11 +159,46 @@ class TurnoverAgent(BaseSpecialistAgent[TurnoverAgentInput]):
                     )
                 )
 
-            timing_risk = (
-                next_reservation is not None
-                and cleaning.target_complete_time >= next_reservation.check_in_time
+            ready_deadline = None
+            if next_reservation is not None:
+                ready_deadline = datetime.combine(
+                    next_reservation.check_in_date,
+                    next_reservation.check_in_time,
+                )
+                if property_rule is not None:
+                    ready_deadline -= timedelta(
+                        minutes=property_rule.cleaner_ready_buffer_minutes
+                    )
+            cleaning_target = datetime.combine(
+                cleaning.scheduled_date,
+                cleaning.target_complete_time,
+            )
+            timing_risk = ready_deadline is not None and (
+                cleaning_target > ready_deadline
+                if property_rule is not None
+                else cleaning_target >= ready_deadline
             )
             if timing_risk:
+                timing_evidence = [
+                    FindingEvidence(
+                        source=EvidenceSource.CLEANING_SCHEDULE,
+                        record_ids=[cleaning.id],
+                        fact=(
+                            f"Cleaning targets {cleaning.target_complete_time.strftime('%H:%M')} "
+                            "completion."
+                        ),
+                    ),
+                    FindingEvidence(
+                        source=EvidenceSource.RESERVATIONS,
+                        record_ids=[next_reservation.id],
+                        fact=(
+                            f"{next_reservation.id} checks in at "
+                            f"{next_reservation.check_in_time.strftime('%H:%M')}."
+                        ),
+                    ),
+                ]
+                if property_rule is not None:
+                    timing_evidence.append(self._rule_evidence(property_rule))
                 findings.append(
                     SpecialistFinding(
                         finding_id=f"turnover:timing_risk:{cleaning.id}",
@@ -167,24 +207,7 @@ class TurnoverAgent(BaseSpecialistAgent[TurnoverAgentInput]):
                         category=FindingCategory.TURNOVER_TIMING_RISK,
                         severity=FindingSeverity.CRITICAL,
                         summary="Cleaning target is not before the next check-in time.",
-                        evidence=[
-                            FindingEvidence(
-                                source=EvidenceSource.CLEANING_SCHEDULE,
-                                record_ids=[cleaning.id],
-                                fact=(
-                                    f"Cleaning targets {cleaning.target_complete_time.strftime('%H:%M')} "
-                                    "completion."
-                                ),
-                            ),
-                            FindingEvidence(
-                                source=EvidenceSource.RESERVATIONS,
-                                record_ids=[next_reservation.id],
-                                fact=(
-                                    f"{next_reservation.id} checks in at "
-                                    f"{next_reservation.check_in_time.strftime('%H:%M')}."
-                                ),
-                            ),
-                        ],
+                        evidence=timing_evidence,
                         recommended_next_action="Host should review the turnover timing immediately.",
                         requires_attention=True,
                     )
@@ -217,7 +240,13 @@ class TurnoverAgent(BaseSpecialistAgent[TurnoverAgentInput]):
                                     f"status is {cleaning.status.value}; target is "
                                     f"{cleaning.target_complete_time.strftime('%H:%M')}."
                                 ),
-                            )
+                            ),
+                            *(
+                                [self._rule_evidence(property_rule)]
+                                if property_rule is not None
+                                and next_reservation is not None
+                                else []
+                            ),
                         ],
                         recommended_next_action=None,
                         requires_attention=False,
@@ -236,7 +265,19 @@ class TurnoverAgent(BaseSpecialistAgent[TurnoverAgentInput]):
 
         analyzed_ids = [cleaning.id for cleaning in cleanings]
         analyzed_ids.extend(reservation.id for reservation in reservations)
+        analyzed_ids.extend(rule.id for rule in context.property_rules)
         return self.build_output(context, findings, analyzed_ids)
+
+    @staticmethod
+    def _rule_evidence(rule: PropertyRule) -> FindingEvidence:
+        return FindingEvidence(
+            source=EvidenceSource.PROPERTY_RULES,
+            record_ids=[rule.id],
+            fact=(
+                f"Property rule requires a {rule.cleaner_ready_buffer_minutes}-minute "
+                "cleaner-ready buffer before check-in."
+            ),
+        )
 
     def _missing_schedule_findings(
         self,

@@ -12,6 +12,7 @@ from src.models.operations import (
     CleaningSchedule,
     GuestMessage,
     MaintenanceTicket,
+    PropertyRule,
     Reservation,
 )
 
@@ -56,6 +57,7 @@ class EvidenceSource(StrEnum):
     GUEST_MESSAGES = "guest_messages"
     CLEANING_SCHEDULE = "cleaning_schedule"
     MAINTENANCE_TICKETS = "maintenance_tickets"
+    PROPERTY_RULES = "property_rules"
 
 
 class StrictModel(BaseModel):
@@ -179,6 +181,7 @@ class GuestAgentInput(SpecialistInput):
 class TurnoverAgentInput(SpecialistInput):
     reservations: list[Reservation]
     cleaning_schedule: list[CleaningSchedule]
+    property_rules: list[PropertyRule] = Field(default_factory=list)
 
 
 class MaintenanceAgentInput(SpecialistInput):

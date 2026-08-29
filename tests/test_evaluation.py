@@ -107,6 +107,7 @@ def test_unsupported_critical_claim_checker_is_not_vacuous() -> None:
         "guest_message_context": {},
         "cleaning_context": {},
         "maintenance_context": {},
+        "property_rule_context": {},
         "booking_findings": [
             {
                 "finding_id": "eval:unsupported:critical",

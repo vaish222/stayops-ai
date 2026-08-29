@@ -81,10 +81,33 @@ def test_property_selector_opens_operational_drilldown() -> None:
 
     assert app.exception == []
     assert "Lake House" in [subheader.value for subheader in app.subheader]
-    assert [tab.label for tab in app.tabs] == ["Overview", "Stays", "Operations"]
+    assert [tab.label for tab in app.tabs] == [
+        "Overview",
+        "Stays",
+        "Operations",
+        "Priorities",
+        "Messages",
+        "Cleanings",
+        "Maintenance",
+        "Upcoming arrivals",
+    ]
     assert any(
         "Alex Meadow" in item.value for item in [*app.markdown, *app.text]
     )
+    assert any("Cleaner-ready buffer 120 minutes" in item.value for item in app.markdown)
+
+
+def test_dashboard_exposes_dedicated_operations_views() -> None:
+    app = render_app()
+
+    assert app.exception == []
+    assert [tab.label for tab in app.tabs] == [
+        "Priorities",
+        "Messages",
+        "Cleanings",
+        "Maintenance",
+        "Upcoming arrivals",
+    ]
 
 
 def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:

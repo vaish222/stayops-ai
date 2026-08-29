@@ -69,6 +69,7 @@ def test_guest_query_loads_and_runs_only_guest_context() -> None:
     assert result["property_context"]
     assert result["guest_message_context"]
     assert result["reservation_context"] == {}
+    assert result["property_rule_context"] == {}
     assert result["cleaning_context"] == {}
     assert result["maintenance_context"] == {}
     assert result["booking_findings"] == []
@@ -83,6 +84,7 @@ def test_turnover_query_loads_scoped_booking_and_cleaning_context() -> None:
     assert set(result["property_context"]) == {"prop_lake_house"}
     assert set(result["reservation_context"]) == {"res_lake_001", "res_lake_002"}
     assert set(result["cleaning_context"]) == {"clean_lake_001"}
+    assert set(result["property_rule_context"]) == {"rule_lake_house"}
     assert result["guest_message_context"] == {}
     assert result["maintenance_context"] == {}
     assert result["write_requested"] is True

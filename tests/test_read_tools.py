@@ -11,6 +11,7 @@ from src.models import (
     GuestMessage,
     MaintenanceTicket,
     Property,
+    PropertyRule,
     Reservation,
 )
 from src.tools import (
@@ -22,6 +23,7 @@ from src.tools import (
     get_guest_messages,
     get_maintenance_tickets,
     get_properties,
+    get_property_rules,
     get_reservations,
 )
 
@@ -44,6 +46,15 @@ def test_get_properties_returns_typed_filtered_records() -> None:
         "prop_city_loft",
         "prop_lake_house",
     ]
+
+
+def test_get_property_rules_returns_typed_scoped_rules() -> None:
+    result = get_property_rules(["prop_city_loft"])
+
+    assert result.success is True
+    assert [item.id for item in result.items] == ["rule_city_loft"]
+    assert isinstance(result.items[0], PropertyRule)
+    assert result.items[0].cleaner_ready_buffer_minutes == 90
 
 
 def test_get_reservations_filters_by_property_and_overlapping_date() -> None:

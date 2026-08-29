@@ -3,7 +3,7 @@
   "name": "Guest maintenance complaint requires a reviewed response",
   "category": "guest_maintenance_complaint",
   "passed": true,
-  "latency_ms": 3.375,
+  "latency_ms": 2.586,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -98,7 +98,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 3.375
+        "latency_ms": 2.586
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -132,6 +132,7 @@
     "analysis_complete": true,
     "unavailable_sources": [],
     "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
+    "response_generated": false,
     "finding_categories": [
       "guest_maintenance_report"
     ],
@@ -143,7 +144,7 @@
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.134,
+        "latency_ms": 0.118,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 1,

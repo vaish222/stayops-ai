@@ -18,9 +18,10 @@ no attention.
 
 ## Phase 1: read tools
 
-The `src/tools/` package exposes five read-only functions:
+The `src/tools/` package exposes six read-only functions:
 
 - `get_properties()`
+- `get_property_rules()`
 - `get_reservations()`
 - `get_guest_messages()`
 - `get_cleaning_schedule()`
@@ -64,6 +65,10 @@ The Phase 4 graph routes each request, loads only the required read context,
 and conditionally fans out to the relevant specialists. Broad briefing and risk
 queries run all four specialists concurrently; domain queries run the smallest
 useful specialist set.
+
+Property rules are loaded for turnover analysis. The turnover specialist uses
+the property's cleaner-ready buffer when comparing a cleaning target with the
+next arrival, and cites the exact rule record as evidence.
 
 Retryable read failures are retried once. Persistent source failures become
 structured workflow errors without fabricated findings and set
@@ -166,12 +171,18 @@ reconfirmation before a new capability can be issued.
 These tools are simulations only and do not mutate the JSON fixtures or call an
 external service. Phase 8 does not add a dashboard or any Phase 9 behavior.
 
+The complete Phase 8 graph converges safe requests, rejected reviews, and
+approved execution paths on a typed response generator. It combines the
+evidence-grounded synthesis briefing with the actual review/execution outcome,
+so a pre-approval narrative cannot incorrectly claim that an action ran.
+
 ## Phase 9: Streamlit operations dashboard
 
 The root `app.py` provides the StayOps dashboard for all eight synthetic
 properties. It displays daily Need attention, Watch, and Ready counts; ranked
-issues with source evidence; portfolio cards; and property drill-downs for
-stays, turnovers, and maintenance.
+issues with source evidence; portfolio cards; dedicated Messages, Cleanings,
+Maintenance, and Upcoming arrivals workspaces; and property drill-downs for
+stays, operations, and property rules.
 
 Ask StayOps submits operational questions to the same Phase 8 LangGraph—not a
 separate UI-only workflow. One controller and checkpointer are retained in each
@@ -188,6 +199,22 @@ excluded from this view. The dashboard uses the fixed synthetic operating date
 If a required read source remains unavailable, the dashboard shows an
 incomplete-analysis warning outside debug mode, explains that findings are
 partial, and never presents an unverified property as Ready.
+
+## Architecture alignment
+
+The workflow now implements the non-memory data and control-flow boundaries in
+`architecture.md`: six read sources feed scoped context, four specialists fan
+out in parallel, synthesis precedes a deterministic risk gate, risky paths
+pause for human review, approved writes pass through the protected executor,
+and every terminal path reaches the response generator. The Streamlit surface
+provides the portfolio and dedicated operational views shown in the diagram.
+
+The default router, specialists, synthesizer, and response generator are
+deterministic typed LangChain runnables so local tests and the synthetic demo do
+not require model credentials. Their graph boundaries accept injected runners,
+allowing a chosen structured-output model implementation to replace them
+without changing orchestration or safety controls. No persistent checkpoint or
+Mem0 memory layer is added here; that work is intentionally deferred.
 
 Run the dashboard locally with:
 

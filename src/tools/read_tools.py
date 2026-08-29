@@ -17,6 +17,7 @@ from src.models import (
     MaintenanceStatus,
     MaintenanceTicket,
     Property,
+    PropertyRule,
     Reservation,
 )
 from src.tools.contracts import (
@@ -246,6 +247,33 @@ def get_properties(
         model=Property,
         filters=filters,
         predicate=lambda item: normalized_ids is None or item.id in normalized_ids,
+        data_dir=data_dir,
+        failure_simulator=failure_simulator,
+    )
+
+
+def get_property_rules(
+    property_ids: Collection[str] | None = None,
+    *,
+    data_dir: str | Path = DEFAULT_DATA_DIR,
+    failure_simulator: FailureSimulator | None = None,
+) -> ReadResult[PropertyRule]:
+    """Return operating rules for all or selected properties."""
+
+    tool_name = ReadToolName.GET_PROPERTY_RULES
+    normalized_ids, filter_error = _normalize_property_ids(property_ids, tool_name)
+    filters = _filter_metadata(normalized_ids)
+    if filter_error is not None:
+        return _failure_result(tool_name, filters, filter_error)
+
+    return _read_and_filter(
+        tool_name=tool_name,
+        filename="property_rules.json",
+        model=PropertyRule,
+        filters=filters,
+        predicate=lambda item: (
+            normalized_ids is None or item.property_id in normalized_ids
+        ),
         data_dir=data_dir,
         failure_simulator=failure_simulator,
     )

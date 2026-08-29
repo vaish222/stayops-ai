@@ -219,6 +219,27 @@ def _render_property_drilldown(
         c2.metric("Bathrooms", record["bathrooms"])
         c3.metric("Max guests", record["max_guests"])
         st.write(record["description"])
+        rule = next(
+            (
+                item
+                for item in result.get("property_rule_context", {}).values()
+                if item.get("property_id") == summary.property_id
+            ),
+            None,
+        )
+        if rule is not None:
+            st.markdown("**Operating rules**")
+            st.write(
+                f"Check-in {rule['standard_check_in_time']} · "
+                f"Check-out {rule['standard_check_out_time']} · "
+                f"Cleaner-ready buffer {rule['cleaner_ready_buffer_minutes']} minutes"
+            )
+            st.caption(
+                f"Early check-in: {rule['early_check_in_policy'].replace('_', ' ')} · "
+                f"Pets: {rule['pets_policy'].replace('_', ' ')}"
+            )
+            for house_rule in rule.get("house_rules", []):
+                st.write(f"• {house_rule}")
 
     with stays_tab:
         reservations = [
@@ -317,6 +338,153 @@ def _render_priorities(
                         f"`{', '.join(item['record_ids'])}`"
                     )
                     st.write(item["fact"])
+
+
+def _property_name(result: dict[str, Any], property_id: str) -> str:
+    return result.get("property_context", {}).get(property_id, {}).get(
+        "name", property_id
+    )
+
+
+def _in_property_scope(item: dict[str, Any], property_id: str | None) -> bool:
+    return property_id is None or item.get("property_id") == property_id
+
+
+def _render_messages(result: dict[str, Any], property_id: str | None) -> None:
+    messages = [
+        item
+        for item in result.get("guest_message_context", {}).values()
+        if _in_property_scope(item, property_id)
+    ]
+    if not messages:
+        st.info("No guest messages in the current operating scope.")
+        return
+    st.dataframe(
+        [
+            {
+                "Property": _property_name(result, item["property_id"]),
+                "Guest": item["guest_name"],
+                "Received": item["received_at"],
+                "Direction": item["direction"],
+                "Urgency": item["urgency"],
+                "Needs response": item["requires_response"]
+                and item.get("responded_at") is None,
+                "Message": item["body"],
+            }
+            for item in messages
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+
+
+def _render_cleanings(result: dict[str, Any], property_id: str | None) -> None:
+    cleanings = [
+        item
+        for item in result.get("cleaning_context", {}).values()
+        if _in_property_scope(item, property_id)
+    ]
+    if not cleanings:
+        st.info("No cleaning jobs in the current operating scope.")
+        return
+    st.dataframe(
+        [
+            {
+                "Property": _property_name(result, item["property_id"]),
+                "Date": item["scheduled_date"],
+                "Cleaner": item["cleaner_name"],
+                "Window start": item["window_start"],
+                "Target complete": item["target_complete_time"],
+                "Confirmation": item["confirmation_status"],
+                "Status": item["status"],
+            }
+            for item in cleanings
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+
+
+def _render_maintenance(result: dict[str, Any], property_id: str | None) -> None:
+    tickets = [
+        item
+        for item in result.get("maintenance_context", {}).values()
+        if _in_property_scope(item, property_id)
+    ]
+    if not tickets:
+        st.info("No active maintenance tickets in the current operating scope.")
+        return
+    st.dataframe(
+        [
+            {
+                "Property": _property_name(result, item["property_id"]),
+                "Issue": item["summary"],
+                "Severity": item["severity"],
+                "Status": item["status"],
+                "Blocks check-in": item["blocks_checkin"],
+                "Assigned vendor": item.get("assigned_vendor") or "Unassigned",
+            }
+            for item in tickets
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+
+
+def _render_upcoming_arrivals(
+    result: dict[str, Any],
+    property_id: str | None,
+) -> None:
+    reservations = [
+        item
+        for item in result.get("reservation_context", {}).values()
+        if _in_property_scope(item, property_id) and item.get("status") == "confirmed"
+    ]
+    if not reservations:
+        st.info("No confirmed arrivals in the current operating scope.")
+        return
+    reservations.sort(key=lambda item: (item["check_in_date"], item["check_in_time"]))
+    st.dataframe(
+        [
+            {
+                "Property": _property_name(result, item["property_id"]),
+                "Guest": item["guest_name"],
+                "Check-in date": item["check_in_date"],
+                "Check-in time": item["check_in_time"],
+                "Guests": item["guest_count"],
+                "Source": item["source"],
+            }
+            for item in reservations
+        ],
+        hide_index=True,
+        width="stretch",
+    )
+
+
+def _render_operations_views(
+    result: dict[str, Any],
+    property_id: str | None,
+) -> None:
+    st.subheader("Operations workspace")
+    priorities, messages, cleanings, maintenance, arrivals = st.tabs(
+        [
+            "Priorities",
+            "Messages",
+            "Cleanings",
+            "Maintenance",
+            "Upcoming arrivals",
+        ]
+    )
+    with priorities:
+        _render_priorities(result, property_id)
+    with messages:
+        _render_messages(result, property_id)
+    with cleanings:
+        _render_cleanings(result, property_id)
+    with maintenance:
+        _render_maintenance(result, property_id)
+    with arrivals:
+        _render_upcoming_arrivals(result, property_id)
 
 
 def _render_review(controller: DashboardController) -> None:
@@ -506,7 +674,7 @@ def main() -> None:
         selected_property_id = selected_summary.property_id
 
     st.markdown("---")
-    _render_priorities(daily_result, selected_property_id)
+    _render_operations_views(daily_result, selected_property_id)
     st.markdown("---")
     _render_latest_result(controller)
     _render_review(controller)

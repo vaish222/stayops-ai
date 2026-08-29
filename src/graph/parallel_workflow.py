@@ -29,6 +29,7 @@ from src.tools import (
     get_guest_messages,
     get_maintenance_tickets,
     get_properties,
+    get_property_rules,
     get_reservations,
 )
 from src.tools.read_tools import DEFAULT_DATA_DIR
@@ -58,6 +59,7 @@ SPECIALIST_SOURCE_TOOLS = {
     SpecialistName.TURNOVER: {
         ReadToolName.GET_RESERVATIONS,
         ReadToolName.GET_CLEANING_SCHEDULE,
+        ReadToolName.GET_PROPERTY_RULES,
     },
     SpecialistName.MAINTENANCE: {
         ReadToolName.GET_RESERVATIONS,
@@ -168,6 +170,11 @@ def load_context_node(
             data_dir=data_dir,
             failure_simulator=failure_simulator,
         ),
+        ReadToolName.GET_PROPERTY_RULES: lambda: get_property_rules(
+            property_ids,
+            data_dir=data_dir,
+            failure_simulator=failure_simulator,
+        ),
         ReadToolName.GET_RESERVATIONS: lambda: get_reservations(
             property_ids,
             start_date,
@@ -228,6 +235,7 @@ def load_context_node(
     return {
         "selected_specialists": [specialist.value for specialist in selected],
         "property_context": serialized_index(ReadToolName.GET_PROPERTIES),
+        "property_rule_context": serialized_index(ReadToolName.GET_PROPERTY_RULES),
         "reservation_context": serialized_index(ReadToolName.GET_RESERVATIONS),
         "guest_message_context": serialized_index(ReadToolName.GET_GUEST_MESSAGES),
         "cleaning_context": serialized_index(ReadToolName.GET_CLEANING_SCHEDULE),
@@ -273,6 +281,7 @@ def _specialist_payload(
         payload["guest_messages"] = list(state["guest_message_context"].values())
     if specialist == SpecialistName.TURNOVER:
         payload["cleaning_schedule"] = list(state["cleaning_context"].values())
+        payload["property_rules"] = list(state["property_rule_context"].values())
     if specialist == SpecialistName.MAINTENANCE:
         payload["maintenance_tickets"] = list(state["maintenance_context"].values())
     return payload

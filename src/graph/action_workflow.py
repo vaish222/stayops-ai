@@ -17,6 +17,7 @@ from src.graph.human_review_workflow import (
 )
 from src.graph.parallel_workflow import SpecialistRunner
 from src.graph.risk_workflow import GateRunner
+from src.graph.response_workflow import ResponseRunner, response_generator_node
 from src.graph.state import StayOpsState, WorkflowError
 from src.graph.synthesis_workflow import SynthesisRunner
 from src.models import (
@@ -101,6 +102,7 @@ def build_phase_8_graph(
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
     gate_runner: GateRunner | None = None,
+    response_runner: ResponseRunner | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
     approval_authority: ApprovalAuthority | None = None,
 ):
@@ -119,22 +121,28 @@ def build_phase_8_graph(
         specialist_runners=specialist_runners,
         synthesis_runner=synthesis_runner,
         gate_runner=gate_runner,
+        completion_target="response_generator",
     )
 
     def execute_node(state: StayOpsState) -> dict[str, Any]:
         return execute_approved_actions_node(state, authority=authority)
 
+    def response_node(state: StayOpsState) -> dict[str, Any]:
+        return response_generator_node(state, generator=response_runner)
+
     graph_builder.add_node("execute_approved_actions", execute_node)
+    graph_builder.add_node("response_generator", response_node)
     graph_builder.add_conditional_edges(
         "human_review",
         _route_after_human_review,
         {
             "reconfirm": "human_review",
             "approved": "execute_approved_actions",
-            "rejected": END,
+            "rejected": "response_generator",
         },
     )
-    graph_builder.add_edge("execute_approved_actions", END)
+    graph_builder.add_edge("execute_approved_actions", "response_generator")
+    graph_builder.add_edge("response_generator", END)
     configured_checkpointer = (
         checkpointer if checkpointer is not None else InMemorySaver()
     )

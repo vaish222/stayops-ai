@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class ReadToolName(StrEnum):
     GET_PROPERTIES = "get_properties"
+    GET_PROPERTY_RULES = "get_property_rules"
     GET_RESERVATIONS = "get_reservations"
     GET_GUEST_MESSAGES = "get_guest_messages"
     GET_CLEANING_SCHEDULE = "get_cleaning_schedule"
@@ -65,4 +66,3 @@ class ReadResult(BaseModel, Generic[RecordT]):
         if self.metadata.returned_count != len(self.items):
             raise ValueError("returned_count must match the number of items")
         return self
-
