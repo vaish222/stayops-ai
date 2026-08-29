@@ -1,0 +1,98 @@
+[
+  {
+    "id": "prop_lake_house",
+    "name": "Lake House",
+    "description": "A family cabin overlooking fictional Alder Lake.",
+    "location": "Alder Lake, Oregon",
+    "timezone": "America/Los_Angeles",
+    "bedrooms": 3,
+    "bathrooms": 2.0,
+    "max_guests": 8,
+    "active": true,
+    "is_synthetic": true
+  },
+  {
+    "id": "prop_pine_house",
+    "name": "Pine House",
+    "description": "A quiet home beneath the pines in fictional Juniper Ridge.",
+    "location": "Juniper Ridge, Arizona",
+    "timezone": "America/Phoenix",
+    "bedrooms": 2,
+    "bathrooms": 2.0,
+    "max_guests": 6,
+    "active": true,
+    "is_synthetic": true
+  },
+  {
+    "id": "prop_city_loft",
+    "name": "City Loft",
+    "description": "A bright loft in fictional Harbor City's arts district.",
+    "location": "Harbor City, California",
+    "timezone": "America/Los_Angeles",
+    "bedrooms": 1,
+    "bathrooms": 1.0,
+    "max_guests": 4,
+    "active": true,
+    "is_synthetic": true
+  },
+  {
+    "id": "prop_garden_cottage",
+    "name": "Garden Cottage",
+    "description": "A small cottage set in a private fictional rose garden.",
+    "location": "Maple Glen, Washington",
+    "timezone": "America/Los_Angeles",
+    "bedrooms": 1,
+    "bathrooms": 1.0,
+    "max_guests": 2,
+    "active": true,
+    "is_synthetic": true
+  },
+  {
+    "id": "prop_sunset_house",
+    "name": "Sunset House",
+    "description": "A desert home with wide western views in fictional Mesa Sol.",
+    "location": "Mesa Sol, New Mexico",
+    "timezone": "America/Denver",
+    "bedrooms": 3,
+    "bathrooms": 2.5,
+    "max_guests": 7,
+    "active": true,
+    "is_synthetic": true
+  },
+  {
+    "id": "prop_beach_bungalow",
+    "name": "Beach Bungalow",
+    "description": "A compact bungalow near fictional Pelican Beach.",
+    "location": "Pelican Beach, Florida",
+    "timezone": "America/New_York",
+    "bedrooms": 2,
+    "bathrooms": 1.0,
+    "max_guests": 5,
+    "active": true,
+    "is_synthetic": true
+  },
+  {
+    "id": "prop_mountain_retreat",
+    "name": "Mountain Retreat",
+    "description": "A secluded lodge below fictional Summit Peak.",
+    "location": "Summit Peak, Colorado",
+    "timezone": "America/Denver",
+    "bedrooms": 4,
+    "bathrooms": 3.0,
+    "max_guests": 10,
+    "active": true,
+    "is_synthetic": true
+  },
+  {
+    "id": "prop_downtown_suite",
+    "name": "Downtown Suite",
+    "description": "A modern suite in fictional Riverton's central district.",
+    "location": "Riverton, Texas",
+    "timezone": "America/Chicago",
+    "bedrooms": 1,
+    "bathrooms": 1.0,
+    "max_guests": 3,
+    "active": true,
+    "is_synthetic": true
+  }
+]
