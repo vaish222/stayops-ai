@@ -57,6 +57,17 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     )
     assert "Needs Your Attention" in page_markup
     assert page_markup.index("Needs Your Attention") < page_markup.index("Ask StayOps")
+    attention_cards = [
+        item.value for item in app.markdown if 'class="attention-card"' in item.value
+    ]
+    assert len(attention_cards) == 2
+    assert all("needs_attention" in card and "watch" not in card for card in attention_cards)
+    assert "2 properties require action · 3 more properties are on watch" in page_markup
+    assert "Last StayOps run" in page_markup
+    assert page_markup.count("Last StayOps run") == 1
+    assert page_markup.index("Ask StayOps") < page_markup.index("Last StayOps run")
+    assert "None in scope" not in page_markup
+    assert "Prioritized issues" not in page_markup
     property_selector = app.selectbox(key="property_drilldown")
     assert property_selector.options == [
         "All properties",
@@ -80,6 +91,11 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
         "Guests needing replies",
     }
     assert page_markup.count("Your approval is needed") == 1
+    assert "Why your approval is required" in page_markup
+    assert any(
+        "This action will send a message to the cleaner." in item.value
+        for item in app.caption
+    )
     assert len(app.text_area) == 6
 
 
@@ -153,7 +169,8 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     assert not {"Approve & Send", "Approve & Update", "Edit", "Reject"}.intersection(
         button.label for button in app.button
     )
-    assert any("existing operations graph" in item.value for item in app.info)
+    assert any("StayOps checked your operations" in item.value for item in app.info)
+    assert all("existing operations graph" not in item.value for item in app.info)
 
 
 def test_agent_activity_toggle_exposes_specialist_findings() -> None:
@@ -166,9 +183,26 @@ def test_agent_activity_toggle_exposes_specialist_findings() -> None:
     assert any("Request Router" in item.value for item in app.markdown)
     assert any("Operations Synthesizer" in item.value for item in app.markdown)
     assert any("Safety Gate" in item.value for item in app.markdown)
-    assert any("succeeded" in item.value for item in app.markdown)
-    assert any("Booking" in expander.label for expander in app.expander)
-    assert any("Maintenance" in expander.label for expander in app.expander)
+    assert any("Completed" in item.value for item in app.markdown)
+    assert any("Human review required" in item.value for item in app.markdown)
+    assert "Developer details" in {expander.label for expander in app.expander}
+    assert "Structured run details" not in "\n".join(
+        item.value for item in app.markdown
+    )
+
+
+def test_agent_activity_marks_unselected_agents_as_not_needed() -> None:
+    app = render_app()
+    app.text_input[0].input("Which guests are arriving at City Loft today?")
+    app = next(
+        button for button in app.button if button.label == "Ask StayOps"
+    ).click().run()
+    app = app.toggle[0].set_value(True).run()
+
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert app.exception == []
+    assert "Not needed for this request" in page_markup
+    assert "Checks passed" in page_markup
 
 
 def test_raw_record_ids_are_not_exposed_in_operator_views() -> None:
@@ -179,6 +213,22 @@ def test_raw_record_ids_are_not_exposed_in_operator_views() -> None:
     )
     for prefix in ("prop_", "res_", "msg_", "clean_", "maint_"):
         assert prefix not in visible_copy
+
+
+def test_operations_tables_use_human_readable_values() -> None:
+    app = render_app()
+
+    messages = app.dataframe[0].value.to_dict("records")
+    cleanings = app.dataframe[1].value.to_dict("records")
+    maintenance = app.dataframe[2].value.to_dict("records")
+    arrivals = app.dataframe[3].value.to_dict("records")
+
+    assert messages[0]["Received"] == "Aug 28 · 7:10 AM"
+    assert messages[0]["Needs response"] == "Yes"
+    assert cleanings[0]["Target complete"] == "2:00 PM"
+    assert maintenance[1]["Status"] == "In Progress"
+    assert maintenance[1]["Blocks check-in"] == "No"
+    assert arrivals[0]["Source"] == "Marketplace"
 
 
 def test_edit_reconfirm_and_approve_executes_exact_ui_revision() -> None:
@@ -216,7 +266,9 @@ def test_reject_control_records_decision_without_execution() -> None:
     controller = app.session_state["stayops_controller"]
     assert controller.result["human_decision"]["decision"] == "reject"
     assert controller.result["executed_actions"] == []
-    assert any("No action was executed" in item.value for item in app.info)
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Action rejected — nothing was sent." in page_markup
+    assert page_markup.count("Last StayOps run") == 1
 
 
 def test_source_failure_is_prominent_and_requires_acknowledgement() -> None:

@@ -116,22 +116,28 @@ def _install_theme() -> None:
         .issue-title { font-size: 1.04rem; font-weight: 750; margin: .45rem 0 .2rem; }
         .muted { color: var(--muted); font-size: .88rem; }
         .property-name { font-weight: 750; font-size: 1rem; }
-        .attention-card, .property-card, .agent-card, .approval-banner {
+        .attention-card, .property-card, .agent-card, .approval-banner, .last-run-card {
             background:var(--card); border:1px solid var(--line); border-radius:16px; padding:1rem 1.05rem;
         }
-        .attention-card { border-top:4px solid #df7d70; min-height:225px; }
-        .attention-card h3, .property-card h3 { color:var(--navy); font-size:1.03rem; margin:.55rem 0 .35rem; }
+        .attention-card { border-top:4px solid #df7d70; min-height:164px; padding:.82rem .95rem; }
+        .attention-card h3, .property-card h3 { color:var(--navy); font-size:1.03rem; margin:.15rem 0 .35rem; }
+        .card-header { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
         .detail-line { color:#4f626d; font-size:.82rem; margin:.28rem 0; }
         .attention-link { color:var(--teal-dark); font-weight:750; font-size:.84rem; text-decoration:none; }
-        .property-card { min-height:215px; }
-        .property-meta { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.45rem; margin:.75rem 0; }
-        .property-meta div { background:#f7f8f5; border-radius:9px; padding:.48rem; font-size:.74rem; color:#526570; }
+        .watch-summary { color:var(--amber-text); font-size:.82rem; font-weight:700; margin:-.38rem 0 .72rem; }
+        .property-card { min-height:160px; padding:.65rem .72rem; }
+        .property-meta { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.4rem; margin:.52rem 0; }
+        .property-meta div { background:#f7f8f5; border-radius:9px; padding:.36rem .42rem; font-size:.73rem; color:#526570; }
         .property-meta strong { display:block; color:var(--navy); font-size:.72rem; margin-bottom:.1rem; }
         .approval-banner { background:#fff7e2; border-color:#e7c46f; margin:.45rem 0 1rem; }
         .approval-banner strong { display:block; color:#6f4b0d; margin-bottom:.2rem; }
-        .agent-card { min-height:124px; }
+        .last-run-card { background:#edf4f9; border-color:#d8e5ee; padding:.75rem 1rem; margin:.65rem 0 1.1rem; }
+        .last-run-card strong { display:block; color:var(--navy); margin-bottom:.18rem; }
+        .last-run-card span { color:#415967; font-size:.84rem; }
+        .agent-card { min-height:112px; }
         .agent-card strong { color:var(--navy); }
-        .agent-count { font-size:1.55rem; font-weight:800; color:var(--teal-dark); margin:.25rem 0; }
+        .agent-count { font-size:1.12rem; font-weight:800; color:var(--teal-dark); margin:.35rem 0 .2rem; }
+        .agent-status { color:#526570; font-size:.8rem; line-height:1.35; }
         .flow-arrow { text-align:center; color:#789098; font-size:1.25rem; line-height:1; padding:.15rem; }
         .sidebar-brand { font-size:1.1rem; font-weight:850; color:var(--navy); letter-spacing:.08em; margin:.15rem 0 1rem; }
         .sidebar-nav a { display:block; color:#38525f; padding:.52rem .62rem; border-radius:9px; text-decoration:none; font-weight:650; font-size:.88rem; }
@@ -176,6 +182,36 @@ def _format_time(value: str | None) -> str:
         return datetime.strptime(value, "%H:%M:%S").strftime("%I:%M %p").lstrip("0")
     except ValueError:
         return value
+
+
+def _format_date(value: str | None) -> str:
+    if not value:
+        return "—"
+    try:
+        parsed = datetime.fromisoformat(value[:10])
+    except ValueError:
+        return value
+    return f"{parsed.strftime('%b')} {parsed.day}"
+
+
+def _format_timestamp(value: str | None) -> str:
+    if not value:
+        return "—"
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    readable_time = parsed.strftime("%I:%M %p").lstrip("0")
+    return f"{parsed.strftime('%b')} {parsed.day} · {readable_time}"
+
+
+def _humanize(value: Any) -> str:
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    text = str(value)
+    if text == "synthetic_marketplace":
+        return "Marketplace"
+    return text.replace("_", " ").title()
 
 
 def _arrivals_today(result: dict[str, Any]) -> int:
@@ -270,7 +306,7 @@ def _run_query(controller: DashboardController, query: str) -> None:
     else:
         st.session_state.stayops_notice = (
             "info",
-            "StayOps analyzed the request using the existing operations graph.",
+            "StayOps checked your operations.",
         )
 
 
@@ -310,10 +346,7 @@ def _resume_review(
             ),
         )
     else:
-        st.session_state.stayops_notice = (
-            "info",
-            "Rejected. No action was executed.",
-        )
+        st.session_state.pop("stayops_notice", None)
 
 
 def _urgent_findings(result: dict[str, Any], limit: int = 3) -> list[dict[str, Any]]:
@@ -321,7 +354,11 @@ def _urgent_findings(result: dict[str, Any], limit: int = 3) -> list[dict[str, A
     seen_properties: set[str] = set()
     for finding in result.get("priority_items", []):
         property_id = finding.get("property_id")
-        if not finding.get("requires_attention") or property_id in seen_properties:
+        if (
+            not finding.get("requires_attention")
+            or finding.get("severity") not in {"high", "critical"}
+            or property_id in seen_properties
+        ):
             continue
         urgent.append(finding)
         seen_properties.add(property_id)
@@ -330,36 +367,117 @@ def _urgent_findings(result: dict[str, Any], limit: int = 3) -> list[dict[str, A
     return urgent
 
 
+def _attention_key_line(
+    finding: dict[str, Any],
+    result: dict[str, Any],
+) -> str:
+    categories = set(finding.get("categories", []))
+    property_id = finding.get("property_id")
+    reservations = [
+        item
+        for item in result.get("reservation_context", {}).values()
+        if item.get("property_id") == property_id
+    ]
+    cleanings = [
+        item
+        for item in result.get("cleaning_context", {}).values()
+        if item.get("property_id") == property_id
+    ]
+    if "same_day_turnover" in categories or "turnover_timing_risk" in categories:
+        operating_date = result.get("date_scope")
+        departure = next(
+            (item for item in reservations if item.get("check_out_date") == operating_date),
+            None,
+        )
+        arrival = next(
+            (item for item in reservations if item.get("check_in_date") == operating_date),
+            None,
+        )
+        timing = []
+        if departure:
+            timing.append(f"Checkout {_format_time(departure.get('check_out_time'))}")
+        if arrival:
+            timing.append(f"Check-in {_format_time(arrival.get('check_in_time'))}")
+        if cleanings:
+            timing.append(
+                f"Cleaning {_humanize(cleanings[0].get('confirmation_status')).lower()}"
+            )
+        return " → ".join(timing[:2]) + (f" · {timing[2]}" if len(timing) > 2 else "")
+    if categories.intersection(
+        {"guest_maintenance_report", "guest_impacting_maintenance"}
+    ):
+        return "AC not cooling · Guest reply pending"
+    if "open_maintenance" in categories:
+        ticket = next(
+            (
+                item
+                for item in result.get("maintenance_context", {}).values()
+                if item.get("property_id") == property_id
+            ),
+            None,
+        )
+        return (
+            f"{ticket['summary']} · {_humanize(ticket['status'])}"
+            if ticket
+            else "Maintenance issue requires review"
+        )
+    return "Operational issue requires review"
+
+
+def _attention_copy(finding: dict[str, Any], result: dict[str, Any]) -> tuple[str, str]:
+    categories = set(finding.get("categories", []))
+    if categories.intersection({"same_day_turnover", "turnover_timing_risk"}):
+        cleaning = next(
+            (
+                item
+                for item in result.get("cleaning_context", {}).values()
+                if item.get("property_id") == finding.get("property_id")
+            ),
+            None,
+        )
+        target = _format_time(cleaning.get("target_complete_time")) if cleaning else "target time"
+        return "Turnover at risk", f"Confirm cleaner can complete by {target}."
+    if categories.intersection(
+        {"guest_maintenance_report", "guest_impacting_maintenance"}
+    ):
+        return "Guest impacted", "Review guest response and maintenance status."
+    if "open_maintenance" in categories:
+        return "Maintenance needs attention", "Review repair timing and guest impact."
+    return finding["summary"], "Review and handle this issue."
+
+
 def _render_attention(result: dict[str, Any]) -> None:
+    findings = _urgent_findings(result)
+    summaries = build_property_summaries(result)
+    watch_count = sum(summary.health == PropertyHealth.WATCH for summary in summaries)
+    action_noun = "property requires" if len(findings) == 1 else "properties require"
+    watch_copy = (
+        f" · {watch_count} more {'property is' if watch_count == 1 else 'properties are'} on watch"
+        if watch_count
+        else ""
+    )
     _section_heading(
         "needs-attention",
         "Needs Your Attention",
-        "The highest-impact operational issues across the portfolio.",
+        f"{len(findings)} {action_noun} action{watch_copy}",
     )
-    findings = _urgent_findings(result)
     if not findings:
         st.success("No urgent issues need intervention right now.")
         return
     columns = st.columns(len(findings))
     for column, finding in zip(columns, findings, strict=True):
         property_name = _property_name(result, finding["property_id"])
-        health = (
-            PropertyHealth.NEEDS_ATTENTION
-            if finding.get("severity") in {"high", "critical"}
-            else PropertyHealth.WATCH
-        )
-        details = _plain_evidence_lines(finding.get("evidence", []), result)[:2]
-        detail_markup = "".join(
-            f'<div class="detail-line">{escape(line)}</div>' for line in details
-        )
-        next_action = finding.get("recommended_next_action") or "Review the issue."
+        issue_title, next_action = _attention_copy(finding, result)
+        key_line = _attention_key_line(finding, result)
         with column:
             st.markdown(
                 '<div class="attention-card">'
-                f'{_status_pill(health)}'
+                '<div class="card-header">'
                 f'<h3>{escape(property_name)}</h3>'
-                f'<div class="issue-title">{escape(finding["summary"])}</div>'
-                f'{detail_markup}'
+                f'{_status_pill(PropertyHealth.NEEDS_ATTENTION)}'
+                '</div>'
+                f'<div class="issue-title">{escape(issue_title)}</div>'
+                f'<div class="detail-line">{escape(key_line)}</div>'
                 f'<div class="detail-line"><strong>Next:</strong> {escape(next_action)}</div>'
                 '<a class="attention-link" href="#approval-center">Review &amp; Handle →</a>'
                 '</div>',
@@ -396,6 +514,7 @@ def _render_ask_stayops(controller: DashboardController) -> None:
         if column.button(label, key=f"quick_prompt_{label}", width="stretch"):
             _run_query(controller, prompt)
     _show_notice()
+    _render_last_run(controller)
 
 
 def _property_card_details(
@@ -424,12 +543,12 @@ def _property_card_details(
     next_arrival = (
         f"Today, {_format_time(arrivals[0].get('check_in_time'))}"
         if arrivals
-        else "None in scope"
+        else "No arrival today"
     )
     next_departure = (
         f"Today, {_format_time(departures[0].get('check_out_time'))}"
         if departures
-        else "None in scope"
+        else "No departure today"
     )
     cleanings = [
         item
@@ -442,9 +561,9 @@ def _property_card_details(
         if item.get("property_id") == property_id
     ]
     if cleanings:
-        operations = f"Cleaning {cleanings[0]['confirmation_status'].replace('_', ' ')}"
+        operations = f"Cleaning {_humanize(cleanings[0]['confirmation_status'])}"
     elif maintenance:
-        operations = f"Maintenance {maintenance[0]['status'].replace('_', ' ')}"
+        operations = f"Maintenance {_humanize(maintenance[0]['status'])}"
     else:
         operations = "No active task"
     return next_arrival, next_departure, operations
@@ -521,13 +640,13 @@ def _render_property_drilldown(
         if rule is not None:
             st.markdown("**Operating rules**")
             st.write(
-                f"Check-in {rule['standard_check_in_time']} · "
-                f"Check-out {rule['standard_check_out_time']} · "
+                f"Check-in {_format_time(rule['standard_check_in_time'])} · "
+                f"Check-out {_format_time(rule['standard_check_out_time'])} · "
                 f"Cleaner-ready buffer {rule['cleaner_ready_buffer_minutes']} minutes"
             )
             st.caption(
-                f"Early check-in: {rule['early_check_in_policy'].replace('_', ' ')} · "
-                f"Pets: {rule['pets_policy'].replace('_', ' ')}"
+                f"Early check-in: {_humanize(rule['early_check_in_policy'])} · "
+                f"Pets: {_humanize(rule['pets_policy'])}"
             )
             for house_rule in rule.get("house_rules", []):
                 st.write(f"• {house_rule}")
@@ -543,9 +662,9 @@ def _render_property_drilldown(
                 [
                     {
                         "Guest": item["guest_name"],
-                        "Check-in": item["check_in_date"],
-                        "Check-out": item["check_out_date"],
-                        "Status": item["status"],
+                        "Check-in": _format_date(item["check_in_date"]),
+                        "Check-out": _format_date(item["check_out_date"]),
+                        "Status": _humanize(item["status"]),
                     }
                     for item in reservations
                 ],
@@ -570,8 +689,8 @@ def _render_property_drilldown(
         if cleanings:
             for item in cleanings:
                 st.write(
-                    f"{item['scheduled_date']} · {item['cleaner_name']} · "
-                    f"{item['confirmation_status']}"
+                    f"{_format_date(item['scheduled_date'])} · {item['cleaner_name']} · "
+                    f"{_humanize(item['confirmation_status'])}"
                 )
         else:
             st.caption("No cleaning jobs in scope.")
@@ -579,7 +698,8 @@ def _render_property_drilldown(
         if maintenance:
             for item in maintenance:
                 st.write(
-                    f"{item['summary']} · {item['severity']} · {item['status']}"
+                    f"{item['summary']} · {_humanize(item['severity'])} · "
+                    f"{_humanize(item['status'])}"
                 )
         else:
             st.caption("No maintenance tickets in scope.")
@@ -589,7 +709,7 @@ def _render_priorities(
     result: dict[str, Any],
     property_id: str | None,
 ) -> None:
-    st.markdown("#### Prioritized issues")
+    st.caption("Ranked by operational impact and urgency.")
     properties = result.get("property_context", {})
     findings = [
         finding
@@ -625,8 +745,6 @@ def _render_priorities(
             evidence_lines = _plain_evidence_lines(
                 finding.get("evidence", []), result
             )
-            if evidence_lines:
-                st.caption(f"Why StayOps flagged this · {evidence_lines[0]}")
             with st.expander("Why StayOps flagged this"):
                 for line in evidence_lines:
                     st.write(line)
@@ -656,11 +774,12 @@ def _render_messages(result: dict[str, Any], property_id: str | None) -> None:
             {
                 "Property": _property_name(result, item["property_id"]),
                 "Guest": item["guest_name"],
-                "Received": item["received_at"],
-                "Direction": item["direction"],
-                "Urgency": item["urgency"],
-                "Needs response": item["requires_response"]
-                and item.get("responded_at") is None,
+                "Received": _format_timestamp(item["received_at"]),
+                "Direction": _humanize(item["direction"]),
+                "Urgency": _humanize(item["urgency"]),
+                "Needs response": _humanize(
+                    item["requires_response"] and item.get("responded_at") is None
+                ),
                 "Message": item["body"],
             }
             for item in messages
@@ -683,12 +802,12 @@ def _render_cleanings(result: dict[str, Any], property_id: str | None) -> None:
         [
             {
                 "Property": _property_name(result, item["property_id"]),
-                "Date": item["scheduled_date"],
+                "Date": _format_date(item["scheduled_date"]),
                 "Cleaner": item["cleaner_name"],
-                "Window start": item["window_start"],
-                "Target complete": item["target_complete_time"],
-                "Confirmation": item["confirmation_status"],
-                "Status": item["status"],
+                "Window start": _format_time(item["window_start"]),
+                "Target complete": _format_time(item["target_complete_time"]),
+                "Confirmation": _humanize(item["confirmation_status"]),
+                "Status": _humanize(item["status"]),
             }
             for item in cleanings
         ],
@@ -711,9 +830,9 @@ def _render_maintenance(result: dict[str, Any], property_id: str | None) -> None
             {
                 "Property": _property_name(result, item["property_id"]),
                 "Issue": item["summary"],
-                "Severity": item["severity"],
-                "Status": item["status"],
-                "Blocks check-in": item["blocks_checkin"],
+                "Severity": _humanize(item["severity"]),
+                "Status": _humanize(item["status"]),
+                "Blocks check-in": _humanize(item["blocks_checkin"]),
                 "Assigned vendor": item.get("assigned_vendor") or "Unassigned",
             }
             for item in tickets
@@ -741,10 +860,10 @@ def _render_upcoming_arrivals(
             {
                 "Property": _property_name(result, item["property_id"]),
                 "Guest": item["guest_name"],
-                "Check-in date": item["check_in_date"],
-                "Check-in time": item["check_in_time"],
+                "Check-in date": _format_date(item["check_in_date"]),
+                "Check-in time": _format_time(item["check_in_time"]),
                 "Guests": item["guest_count"],
-                "Source": item["source"],
+                "Source": _humanize(item["source"]),
             }
             for item in reservations
         ],
@@ -760,7 +879,7 @@ def _render_operations_views(
     _section_heading(
         "operations-workspace",
         "Operations Workspace",
-        "Move from portfolio status into the operational records behind it.",
+        "See the operational details behind every StayOps alert.",
     )
     priorities, messages, cleanings, maintenance, arrivals = st.tabs(
         [
@@ -783,6 +902,17 @@ def _render_operations_views(
         _render_upcoming_arrivals(result, property_id)
 
 
+def _approval_explanation(action: dict[str, Any]) -> str:
+    tool_name = action.get("tool_name")
+    if tool_name == "send_guest_message":
+        return "This action will send a message to the guest."
+    if tool_name == "send_cleaner_message":
+        return "This action will send a message to the cleaner."
+    if tool_name == "update_maintenance_status":
+        return "This action will update a maintenance record."
+    return "This operational decision requires your review before StayOps continues."
+
+
 def _render_review(controller: DashboardController) -> None:
     request = controller.pending_review
     if request is None:
@@ -802,9 +932,8 @@ def _render_review(controller: DashboardController) -> None:
     )
     actions = request.get("proposed_actions", [])
     if not actions:
-        st.error(request["question"])
-        for reason in request.get("review_reasons", []):
-            st.write(reason["message"])
+        st.error("Some required operational data could not be checked.")
+        st.write("Please acknowledge the incomplete check before continuing.")
         if st.button(
             "Acknowledge",
             type="primary",
@@ -817,12 +946,6 @@ def _render_review(controller: DashboardController) -> None:
     for action in actions:
         action_id = action["action_id"]
         property_name = _property_name(result, action["property_id"])
-        reasons = [
-            reason["message"]
-            for reason in request.get("review_reasons", [])
-            if not reason.get("property_ids")
-            or action["property_id"] in reason.get("property_ids", [])
-        ]
         action_label = action["action_type"].replace("_", " ").title()
         tool_name = action.get("tool_name")
         approve_label = (
@@ -837,8 +960,8 @@ def _render_review(controller: DashboardController) -> None:
                 f"### {escape(property_name)}  \n"
                 f"**{escape(action_label)}**"
             )
-            if reasons:
-                st.caption(f"Why this needs review · {reasons[0]}")
+            st.markdown("**Why your approval is required**")
+            st.caption(_approval_explanation(action))
             st.markdown("**Proposed action**")
             edit_key = f"edited_action_{controller.thread_id}_{action_id}"
             edited_description = st.text_area(
@@ -883,51 +1006,44 @@ def _render_review(controller: DashboardController) -> None:
                 st.rerun()
 
 
-def _execution_label(result: dict[str, Any], execution: dict[str, Any]) -> str:
-    target = execution.get("target_record_id")
-    tool_name = execution.get("tool_name", "operational action")
-    context_field = {
-        "send_guest_message": "guest_message_context",
-        "send_cleaner_message": "cleaning_context",
-        "update_maintenance_status": "maintenance_context",
-    }.get(tool_name)
-    record = result.get(context_field or "", {}).get(target, {})
-    property_name = _property_name(result, record.get("property_id", ""))
-    readable_tool = {
-        "send_guest_message": "guest message",
-        "send_cleaner_message": "cleaner message",
-        "update_maintenance_status": "maintenance update",
-    }.get(tool_name, "operational action")
-    if property_name:
-        return f"Simulated {readable_tool} completed for {property_name}."
-    return f"Simulated {readable_tool} completed."
-
-
-def _render_latest_result(controller: DashboardController) -> None:
+def _last_run_copy(controller: DashboardController) -> str:
     result = controller.result
     if result is None:
-        return
-    _section_heading("latest-response", "Latest StayOps Response")
-    st.caption(controller.last_query)
-    warning = (
-        incomplete_analysis_message(result)
-        if result is not controller.daily_result
-        else None
-    )
-    if warning:
-        st.error(warning, icon="⚠️")
-    response = result.get("final_response") or "The workflow returned no narrative response."
+        return "StayOps has not run yet."
+    if incomplete_analysis_message(result):
+        return "StayOps could not check every required source. Review the incomplete analysis."
+    decision = result.get("human_decision") or {}
+    if decision.get("decision") == "reject":
+        return "Action rejected — nothing was sent."
     if result.get("executed_actions"):
-        briefing = result.get("synthesis_briefing", "StayOps completed the review.")
         execution_count = len(result["executed_actions"])
         noun = "action" if execution_count == 1 else "actions"
-        response = f"{briefing}\n\nApproved: {execution_count} simulated {noun} executed."
-    st.write(response)
-    if result.get("executed_actions"):
-        for execution in result["executed_actions"]:
-            st.success(_execution_label(result, execution))
-    if result.get("errors"):
-        st.error(f"{len(result['errors'])} workflow error(s) were recorded.")
+        return f"{execution_count} approved {noun} completed."
+    findings = [
+        item
+        for item in result.get("priority_items", [])
+        if item.get("requires_attention")
+    ]
+    if not findings:
+        return "StayOps checked this request. No operational issues need attention."
+    property_name = _property_name(result, findings[0].get("property_id", ""))
+    issue_noun = "issue needs" if len(findings) == 1 else "issues need"
+    copy = f"{len(findings)} {issue_noun} attention"
+    if property_name:
+        copy += f" · {property_name}: {findings[0]['summary']}"
+    if controller.pending_review is not None:
+        copy += " · Your approval is required."
+    return copy
+
+
+def _render_last_run(controller: DashboardController) -> None:
+    st.markdown(
+        '<div id="last-stayops-run" class="last-run-card">'
+        '<strong>Last StayOps run</strong>'
+        f'<span>{escape(_last_run_copy(controller))}</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_agent_activity(result: dict[str, Any]) -> None:
@@ -957,15 +1073,23 @@ def _render_agent_activity(result: dict[str, Any]) -> None:
     for column, (label, agent_name, field) in zip(columns, fields, strict=True):
         run = runs.get(agent_name, {})
         findings_count = len(result.get(field, []))
-        status = run.get("status", "idle")
-        latency = run.get("latency_ms")
-        latency_text = f" · {latency} ms" if latency is not None else ""
+        if not run:
+            headline = "Not needed"
+            status_copy = "Not needed for this request"
+        elif run.get("status") == "failed":
+            headline = "Failed"
+            status_copy = "Failed · Review developer details"
+        else:
+            headline = "Completed"
+            finding_noun = "finding" if findings_count == 1 else "findings"
+            seconds = float(run.get("latency_ms", 0)) / 1000
+            status_copy = f"Completed · {findings_count} {finding_noun} · {seconds:.2f}s"
         with column:
             st.markdown(
                 '<div class="agent-card">'
                 f'<strong>{label}</strong>'
-                f'<div class="agent-count">{findings_count}</div>'
-                f'<div class="muted">findings · {escape(str(status))}{latency_text}</div>'
+                f'<div class="agent-count">{headline}</div>'
+                f'<div class="agent-status">{escape(status_copy)}</div>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -982,24 +1106,20 @@ def _render_agent_activity(result: dict[str, Any]) -> None:
             unsafe_allow_html=True,
         )
     with gate_col:
+        gate_status = "Human review required" if review_count else "Checks passed"
         st.markdown(
             '<div class="agent-card"><strong>Safety Gate</strong>'
-            f'<div class="agent-count">{"Review" if review_count else "Clear"}</div>'
+            f'<div class="agent-count">{gate_status}</div>'
             f'<div class="muted">{review_count} review reasons · {error_count} errors</div></div>',
             unsafe_allow_html=True,
         )
-    st.markdown("#### Structured run details")
-    for label, field in (
-        ("Booking", "booking_findings"),
-        ("Guest", "guest_findings"),
-        ("Turnover", "turnover_findings"),
-        ("Maintenance", "maintenance_findings"),
-    ):
-        with st.expander(f"{label} · {len(result.get(field, []))} findings"):
-            st.json(result.get(field, []))
-    with st.expander("Agent runs and workflow errors"):
+    with st.expander("Developer details", expanded=False):
         st.json(
             {
+                "booking_findings": result.get("booking_findings", []),
+                "guest_findings": result.get("guest_findings", []),
+                "turnover_findings": result.get("turnover_findings", []),
+                "maintenance_findings": result.get("maintenance_findings", []),
                 "agent_runs": result.get("agent_runs", []),
                 "errors": result.get("errors", []),
             }
@@ -1067,7 +1187,10 @@ def main() -> None:
             key="property_drilldown",
         )
         activity_mode = st.toggle("Agent Activity", value=False)
-        st.caption(f"Operating date · {daily_result.get('date_scope', '2026-08-28')}")
+        st.caption(
+            f"Operating date · "
+            f"{_format_date(daily_result.get('date_scope', '2026-08-28'))}"
+        )
         st.markdown("---")
         st.caption("Synthetic operations data · simulated writes only")
 
@@ -1097,7 +1220,6 @@ def main() -> None:
 
     _render_operations_views(daily_result, selected_property_id)
     _render_review(controller)
-    _render_latest_result(controller)
 
     if activity_mode and controller.result is not None:
         _render_agent_activity(controller.result)
