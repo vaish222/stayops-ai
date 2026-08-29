@@ -1,0 +1,117 @@
+"""Pure presenter and graph-controller tests for the Phase 9 dashboard."""
+
+from __future__ import annotations
+
+from src.models import WriteToolName
+from src.ui import (
+    DashboardController,
+    PropertyHealth,
+    build_property_summaries,
+    count_property_health,
+    evidence_for_action,
+)
+
+
+def deterministic_controller() -> DashboardController:
+    thread_ids = iter(["dashboard-daily", "dashboard-query"])
+    return DashboardController(thread_id_factory=lambda: next(thread_ids))
+
+
+def test_daily_dashboard_summarizes_all_eight_properties() -> None:
+    controller = deterministic_controller()
+
+    result = controller.load_daily_briefing()
+    summaries = build_property_summaries(result)
+    counts = count_property_health(summaries)
+
+    assert len(summaries) == 8
+    assert counts == {
+        PropertyHealth.NEEDS_ATTENTION: 2,
+        PropertyHealth.WATCH: 3,
+        PropertyHealth.READY: 3,
+    }
+    assert sum(counts.values()) == 8
+    assert {summary.name for summary in summaries} == {
+        "Lake House",
+        "Pine House",
+        "City Loft",
+        "Garden Cottage",
+        "Sunset House",
+        "Beach Bungalow",
+        "Mountain Retreat",
+        "Downtown Suite",
+    }
+
+
+def test_property_summary_uses_highest_priority_attention_finding() -> None:
+    controller = deterministic_controller()
+    result = controller.load_daily_briefing()
+
+    summaries = {
+        summary.property_id: summary for summary in build_property_summaries(result)
+    }
+
+    assert summaries["prop_lake_house"].health == PropertyHealth.NEEDS_ATTENTION
+    assert "cleaner confirmation" in summaries["prop_lake_house"].headline.lower()
+    assert summaries["prop_pine_house"].health == PropertyHealth.NEEDS_ATTENTION
+    assert summaries["prop_garden_cottage"].health == PropertyHealth.READY
+
+
+def test_review_action_maps_only_to_its_supporting_evidence() -> None:
+    controller = deterministic_controller()
+    controller.load_daily_briefing()
+    request = controller.pending_review
+    assert request is not None
+    action = next(
+        action
+        for action in request["proposed_actions"]
+        if action["tool_name"] == WriteToolName.SEND_CLEANER_MESSAGE
+    )
+
+    evidence = evidence_for_action(action, request["findings"])
+
+    record_ids = {
+        record_id for item in evidence for record_id in item["record_ids"]
+    }
+    assert "clean_lake_001" in record_ids
+    assert "maint_pine_001" not in record_ids
+
+
+def test_ask_stayops_uses_new_thread_without_replacing_daily_portfolio() -> None:
+    controller = deterministic_controller()
+    controller.load_daily_briefing()
+
+    query_result = controller.run_query(
+        "Which guests are arriving at City Loft today?"
+    )
+
+    assert controller.thread_id == "dashboard-query"
+    assert controller.pending_review is None
+    assert query_result["property_scope"] == ["prop_city_loft"]
+    assert controller.daily_result is not None
+    assert len(build_property_summaries(controller.daily_result)) == 8
+
+
+def test_controller_resumes_approval_on_same_thread_and_exposes_execution() -> None:
+    controller = deterministic_controller()
+    controller.load_daily_briefing()
+    request = controller.pending_review
+    assert request is not None
+    action = next(
+        action
+        for action in request["proposed_actions"]
+        if action["tool_name"] == WriteToolName.SEND_CLEANER_MESSAGE
+    )
+
+    completed = controller.resume_review(
+        "approve",
+        action_id=action["action_id"],
+    )
+
+    assert controller.thread_id == "dashboard-daily"
+    assert controller.pending_review is None
+    assert completed["human_decision"]["decision"] == "approve"
+    assert completed["executed_actions"][0]["tool_name"] == (
+        WriteToolName.SEND_CLEANER_MESSAGE
+    )
+    assert controller.daily_result == completed

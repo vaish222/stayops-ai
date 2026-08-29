@@ -12,6 +12,7 @@ dependencies = [
     "langchain-core>=1.6,<2",
     "langgraph>=1.2,<2",
     "pydantic>=2.10,<3",
+    "streamlit>=1.40,<2",
 ]
 
 [dependency-groups]

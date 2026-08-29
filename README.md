@@ -162,6 +162,31 @@ reconfirmation before a new capability can be issued.
 These tools are simulations only and do not mutate the JSON fixtures or call an
 external service. Phase 8 does not add a dashboard or any Phase 9 behavior.
 
+## Phase 9: Streamlit operations dashboard
+
+The root `app.py` provides the StayOps dashboard for all eight synthetic
+properties. It displays daily Need attention, Watch, and Ready counts; ranked
+issues with source evidence; portfolio cards; and property drill-downs for
+stays, turnovers, and maintenance.
+
+Ask StayOps submits operational questions to the same Phase 8 LangGraph—not a
+separate UI-only workflow. One controller and checkpointer are retained in each
+Streamlit session, so interrupted actions resume the same thread. The approval
+panel exposes the reviewed action and supporting evidence with Approve, Edit &
+reconfirm, and Reject controls. Successful approvals show only the resulting
+simulated execution record.
+
+A sidebar toggle reveals the four specialists' structured findings, run logs,
+and workflow errors for debugging. Approval capability values are intentionally
+excluded from this view. The dashboard uses the fixed synthetic operating date
+`2026-08-28` and does not implement Phase 10 evaluation behavior.
+
+Run the dashboard locally with:
+
+```bash
+uv run streamlit run app.py
+```
+
 Install and validate with:
 
 ```bash
