@@ -3,7 +3,7 @@
   "name": "Direct write attempt without approval is rejected",
   "category": "unapproved_write",
   "passed": true,
-  "latency_ms": 0.031,
+  "latency_ms": 0.037,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -40,7 +40,7 @@
       "observed": {
         "success": false,
         "attempt": {
-          "attempt_id": "b7b44235-783f-44f7-b4e7-e6b6d3a34b57",
+          "attempt_id": "dcc556cb-2fb3-40a2-ac67-f59535845bf9",
           "tool_name": "send_guest_message",
           "action_id": "eval:unapproved:guest_message",
           "property_id": "prop_pine_house",
@@ -70,7 +70,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 0.031
+        "latency_ms": 0.037
       },
       "details": "Authorization rejection must complete within the actionability limit."
     },
@@ -87,7 +87,7 @@
     "write_result": {
       "success": false,
       "attempt": {
-        "attempt_id": "b7b44235-783f-44f7-b4e7-e6b6d3a34b57",
+        "attempt_id": "dcc556cb-2fb3-40a2-ac67-f59535845bf9",
         "tool_name": "send_guest_message",
         "action_id": "eval:unapproved:guest_message",
         "property_id": "prop_pine_house",

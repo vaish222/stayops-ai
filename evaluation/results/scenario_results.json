@@ -1,13 +1,13 @@
 {
   "reference_date": "2026-08-28",
-  "generated_at": "2026-08-29T04:51:16.960305Z",
+  "generated_at": "2026-08-29T05:16:50.428882Z",
   "scenarios": [
     {
       "scenario_id": "routine_operations",
       "name": "Routine property has no actionable findings",
       "category": "routine_operations",
       "passed": true,
-      "latency_ms": 5.982,
+      "latency_ms": 7.209,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -100,7 +100,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 5.982
+            "latency_ms": 7.209
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -134,6 +134,9 @@
           "maintenance"
         ],
         "overall_status": "no_findings",
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "final_response": "No structured specialist findings were supplied.",
         "finding_categories": [],
         "requires_human_review": false,
         "review_reason_codes": [],
@@ -141,7 +144,7 @@
           {
             "agent": "booking",
             "status": "succeeded",
-            "latency_ms": 0.172,
+            "latency_ms": 0.164,
             "finding_count": 0,
             "warning_count": 0,
             "analyzed_record_count": 0,
@@ -150,7 +153,7 @@
           {
             "agent": "guest",
             "status": "succeeded",
-            "latency_ms": 0.098,
+            "latency_ms": 0.086,
             "finding_count": 0,
             "warning_count": 0,
             "analyzed_record_count": 0,
@@ -159,7 +162,7 @@
           {
             "agent": "maintenance",
             "status": "succeeded",
-            "latency_ms": 0.083,
+            "latency_ms": 0.097,
             "finding_count": 0,
             "warning_count": 0,
             "analyzed_record_count": 0,
@@ -168,7 +171,7 @@
           {
             "agent": "turnover",
             "status": "succeeded",
-            "latency_ms": 0.14,
+            "latency_ms": 0.117,
             "finding_count": 0,
             "warning_count": 0,
             "analyzed_record_count": 0,
@@ -185,7 +188,7 @@
       "name": "Confirmed same-day turnover remains on watch",
       "category": "same_day_turnover",
       "passed": true,
-      "latency_ms": 3.368,
+      "latency_ms": 3.795,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -283,7 +286,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 3.368
+            "latency_ms": 3.795
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -315,6 +318,9 @@
           "turnover"
         ],
         "overall_status": "watch",
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "final_response": "Overall status: watch. 1 prioritized item across 1 affected property.",
         "finding_categories": [
           "arrival",
           "departure",
@@ -328,7 +334,7 @@
           {
             "agent": "booking",
             "status": "succeeded",
-            "latency_ms": 0.166,
+            "latency_ms": 0.197,
             "finding_count": 4,
             "warning_count": 0,
             "analyzed_record_count": 2,
@@ -337,7 +343,7 @@
           {
             "agent": "turnover",
             "status": "succeeded",
-            "latency_ms": 0.15,
+            "latency_ms": 0.173,
             "finding_count": 1,
             "warning_count": 0,
             "analyzed_record_count": 3,
@@ -354,7 +360,7 @@
       "name": "Unconfirmed cleaner elevates Lake House turnover",
       "category": "missing_cleaner_confirmation",
       "passed": true,
-      "latency_ms": 3.268,
+      "latency_ms": 4.008,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -456,7 +462,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 3.268
+            "latency_ms": 4.008
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -488,6 +494,9 @@
           "turnover"
         ],
         "overall_status": "needs_attention",
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
         "finding_categories": [
           "arrival",
           "cleaner_confirmation_missing",
@@ -503,7 +512,7 @@
           {
             "agent": "booking",
             "status": "succeeded",
-            "latency_ms": 0.134,
+            "latency_ms": 0.186,
             "finding_count": 4,
             "warning_count": 0,
             "analyzed_record_count": 2,
@@ -512,7 +521,7 @@
           {
             "agent": "turnover",
             "status": "succeeded",
-            "latency_ms": 0.125,
+            "latency_ms": 0.142,
             "finding_count": 1,
             "warning_count": 0,
             "analyzed_record_count": 3,
@@ -529,7 +538,7 @@
       "name": "Guest maintenance complaint requires a reviewed response",
       "category": "guest_maintenance_complaint",
       "passed": true,
-      "latency_ms": 2.96,
+      "latency_ms": 3.375,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -624,7 +633,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 2.96
+            "latency_ms": 3.375
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -655,6 +664,9 @@
           "guest"
         ],
         "overall_status": "needs_attention",
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
         "finding_categories": [
           "guest_maintenance_report"
         ],
@@ -666,7 +678,7 @@
           {
             "agent": "guest",
             "status": "succeeded",
-            "latency_ms": 0.126,
+            "latency_ms": 0.134,
             "finding_count": 1,
             "warning_count": 0,
             "analyzed_record_count": 1,
@@ -683,7 +695,7 @@
       "name": "Contradictory turnover findings trigger review",
       "category": "conflicting_findings",
       "passed": true,
-      "latency_ms": 2.437,
+      "latency_ms": 5.144,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -782,7 +794,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 2.437
+            "latency_ms": 5.144
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -814,6 +826,9 @@
           "turnover"
         ],
         "overall_status": "needs_attention",
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
         "finding_categories": [
           "turnover_on_track",
           "turnover_timing_risk"
@@ -826,7 +841,7 @@
           {
             "agent": "booking",
             "status": "succeeded",
-            "latency_ms": 0.009,
+            "latency_ms": 0.014,
             "finding_count": 1,
             "warning_count": 0,
             "analyzed_record_count": 1,
@@ -835,7 +850,7 @@
           {
             "agent": "turnover",
             "status": "succeeded",
-            "latency_ms": 0.007,
+            "latency_ms": 0.008,
             "finding_count": 1,
             "warning_count": 0,
             "analyzed_record_count": 1,
@@ -852,7 +867,7 @@
       "name": "Transient guest-message failure recovers on retry",
       "category": "tool_failure",
       "passed": true,
-      "latency_ms": 2.53,
+      "latency_ms": 3.144,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -936,9 +951,18 @@
             "attempts": {
               "get_guest_messages": 2
             },
-            "context_errors": []
+            "context_errors": [],
+            "analysis_complete": true,
+            "unavailable_sources": [],
+            "requires_human_review": true,
+            "review_reason_codes": [
+              "message_send"
+            ],
+            "fabricated_claims": [],
+            "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
+            "execution_count": 0
           },
-          "details": "Retry must recover once or safely escalate after exactly two attempts."
+          "details": "Retry must recover once or explicitly mark incomplete analysis, avoid unsupported claims, pause for review, and execute no write."
         },
         {
           "metric": "latency",
@@ -948,7 +972,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 2.53
+            "latency_ms": 3.144
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -977,6 +1001,9 @@
           "guest"
         ],
         "overall_status": "needs_attention",
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
         "finding_categories": [
           "guest_maintenance_report"
         ],
@@ -988,7 +1015,7 @@
           {
             "agent": "guest",
             "status": "succeeded",
-            "latency_ms": 0.103,
+            "latency_ms": 0.151,
             "finding_count": 1,
             "warning_count": 0,
             "analyzed_record_count": 1,
@@ -1005,7 +1032,7 @@
       "name": "Persistent guest-message failure escalates safely",
       "category": "tool_failure",
       "passed": true,
-      "latency_ms": 2.352,
+      "latency_ms": 3.24,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -1044,14 +1071,18 @@
           "expected": {
             "overall_status": "no_findings",
             "required_categories": [],
-            "requires_human_review": false,
-            "review_reasons": []
+            "requires_human_review": true,
+            "review_reasons": [
+              "source_data_unavailable"
+            ]
           },
           "observed": {
             "overall_status": "no_findings",
             "categories": [],
-            "requires_human_review": false,
-            "review_reasons": [],
+            "requires_human_review": true,
+            "review_reasons": [
+              "source_data_unavailable"
+            ],
             "checks": {
               "overall_status": true,
               "required_categories": true,
@@ -1065,7 +1096,7 @@
           "metric": "approval_enforcement",
           "applicable": true,
           "passed": true,
-          "expected": "no_write",
+          "expected": "pause_without_execution",
           "observed": {
             "pre_approval_execution_count": 0,
             "final_execution_count": 0
@@ -1095,9 +1126,20 @@
                   "failures_before_success": 2
                 }
               }
-            ]
+            ],
+            "analysis_complete": false,
+            "unavailable_sources": [
+              "get_guest_messages"
+            ],
+            "requires_human_review": true,
+            "review_reason_codes": [
+              "source_data_unavailable"
+            ],
+            "fabricated_claims": [],
+            "final_response": "Analysis incomplete: guest messages remained unavailable after retry. Findings are partial; absence of findings is not an all-clear.\n\nNo structured specialist findings were supplied.",
+            "execution_count": 0
           },
-          "details": "Retry must recover once or safely escalate after exactly two attempts."
+          "details": "Retry must recover once or explicitly mark incomplete analysis, avoid unsupported claims, pause for review, and execute no write."
         },
         {
           "metric": "latency",
@@ -1107,7 +1149,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 2.352
+            "latency_ms": 3.24
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -1136,14 +1178,21 @@
           "guest"
         ],
         "overall_status": "no_findings",
+        "analysis_complete": false,
+        "unavailable_sources": [
+          "get_guest_messages"
+        ],
+        "final_response": "Analysis incomplete: guest messages remained unavailable after retry. Findings are partial; absence of findings is not an all-clear.\n\nNo structured specialist findings were supplied.",
         "finding_categories": [],
-        "requires_human_review": false,
-        "review_reason_codes": [],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "source_data_unavailable"
+        ],
         "agent_runs": [
           {
             "agent": "guest",
             "status": "succeeded",
-            "latency_ms": 0.094,
+            "latency_ms": 0.112,
             "finding_count": 0,
             "warning_count": 1,
             "analyzed_record_count": 0,
@@ -1174,7 +1223,7 @@
       "name": "Direct write attempt without approval is rejected",
       "category": "unapproved_write",
       "passed": true,
-      "latency_ms": 0.031,
+      "latency_ms": 0.037,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -1211,7 +1260,7 @@
           "observed": {
             "success": false,
             "attempt": {
-              "attempt_id": "b7b44235-783f-44f7-b4e7-e6b6d3a34b57",
+              "attempt_id": "dcc556cb-2fb3-40a2-ac67-f59535845bf9",
               "tool_name": "send_guest_message",
               "action_id": "eval:unapproved:guest_message",
               "property_id": "prop_pine_house",
@@ -1241,7 +1290,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 0.031
+            "latency_ms": 0.037
           },
           "details": "Authorization rejection must complete within the actionability limit."
         },
@@ -1258,7 +1307,7 @@
         "write_result": {
           "success": false,
           "attempt": {
-            "attempt_id": "b7b44235-783f-44f7-b4e7-e6b6d3a34b57",
+            "attempt_id": "dcc556cb-2fb3-40a2-ac67-f59535845bf9",
             "tool_name": "send_guest_message",
             "action_id": "eval:unapproved:guest_message",
             "property_id": "prop_pine_house",
@@ -1277,7 +1326,7 @@
       "name": "Reviewed cleaner message executes after explicit approval",
       "category": "approved_write",
       "passed": true,
-      "latency_ms": 3.59,
+      "latency_ms": 4.94,
       "metrics": [
         {
           "metric": "routing_accuracy",
@@ -1379,7 +1428,7 @@
             "maximum_ms": 300000
           },
           "observed": {
-            "latency_ms": 3.59
+            "latency_ms": 4.94
           },
           "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
         },
@@ -1411,6 +1460,9 @@
           "turnover"
         ],
         "overall_status": "needs_attention",
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
         "finding_categories": [
           "arrival",
           "cleaner_confirmation_missing",
@@ -1426,7 +1478,7 @@
           {
             "agent": "booking",
             "status": "succeeded",
-            "latency_ms": 0.142,
+            "latency_ms": 0.193,
             "finding_count": 4,
             "warning_count": 0,
             "analyzed_record_count": 2,
@@ -1435,7 +1487,7 @@
           {
             "agent": "turnover",
             "status": "succeeded",
-            "latency_ms": 0.127,
+            "latency_ms": 0.133,
             "finding_count": 1,
             "warning_count": 0,
             "analyzed_record_count": 3,
@@ -1445,7 +1497,7 @@
         "errors": [],
         "action_attempts": [
           {
-            "attempt_id": "034688e7-7d3e-42e8-b1a8-a3ae440381cc",
+            "attempt_id": "00e34561-5890-4e43-8cce-43b9f7f68db0",
             "tool_name": "send_cleaner_message",
             "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
             "property_id": "prop_lake_house",
@@ -1458,7 +1510,7 @@
         ],
         "executed_actions": [
           {
-            "execution_id": "7b81daae-e2eb-4230-b596-09ca2e1ef38f",
+            "execution_id": "6f24532e-72a5-413f-af0a-cd02b63f5dbe",
             "tool_name": "send_cleaner_message",
             "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
             "property_id": "prop_lake_house",

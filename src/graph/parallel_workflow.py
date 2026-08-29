@@ -217,6 +217,14 @@ def load_context_node(
             for item in records_by_tool[tool_name]
         }
 
+    unavailable_sources = list(
+        dict.fromkeys(
+            error["tool_name"]
+            for error in errors
+            if error.get("tool_name")
+        )
+    )
+
     return {
         "selected_specialists": [specialist.value for specialist in selected],
         "property_context": serialized_index(ReadToolName.GET_PROPERTIES),
@@ -224,6 +232,8 @@ def load_context_node(
         "guest_message_context": serialized_index(ReadToolName.GET_GUEST_MESSAGES),
         "cleaning_context": serialized_index(ReadToolName.GET_CLEANING_SCHEDULE),
         "maintenance_context": serialized_index(ReadToolName.GET_MAINTENANCE_TICKETS),
+        "analysis_complete": not unavailable_sources,
+        "unavailable_sources": unavailable_sources,
         "errors": errors,
     }
 

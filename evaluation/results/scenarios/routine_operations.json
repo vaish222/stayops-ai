@@ -3,7 +3,7 @@
   "name": "Routine property has no actionable findings",
   "category": "routine_operations",
   "passed": true,
-  "latency_ms": 5.982,
+  "latency_ms": 7.209,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -96,7 +96,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 5.982
+        "latency_ms": 7.209
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -130,6 +130,9 @@
       "maintenance"
     ],
     "overall_status": "no_findings",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "No structured specialist findings were supplied.",
     "finding_categories": [],
     "requires_human_review": false,
     "review_reason_codes": [],
@@ -137,7 +140,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.172,
+        "latency_ms": 0.164,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -146,7 +149,7 @@
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.098,
+        "latency_ms": 0.086,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -155,7 +158,7 @@
       {
         "agent": "maintenance",
         "status": "succeeded",
-        "latency_ms": 0.083,
+        "latency_ms": 0.097,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -164,7 +167,7 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.14,
+        "latency_ms": 0.117,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,

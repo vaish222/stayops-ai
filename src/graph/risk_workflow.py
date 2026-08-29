@@ -45,6 +45,7 @@ def risk_gate_node(
     ]
     payload = {
         "write_requested": state["write_requested"],
+        "unavailable_sources": state["unavailable_sources"],
         "specialist_findings": specialist_findings,
         "prioritized_findings": state["operational_findings"],
         "proposed_actions": state["proposed_actions"],

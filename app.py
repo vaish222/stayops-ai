@@ -14,6 +14,7 @@ from src.ui import (
     build_property_summaries,
     count_property_health,
     evidence_for_action,
+    incomplete_analysis_message,
 )
 
 
@@ -149,6 +150,8 @@ def _resume_review(
     action_id: str | None,
     edited_description: str | None = None,
 ) -> None:
+    review = controller.pending_review or {}
+    acknowledgement_only = not review.get("proposed_actions")
     try:
         result = controller.resume_review(
             decision,
@@ -168,6 +171,9 @@ def _resume_review(
         st.session_state.stayops_notice = (
             "success",
             (
+                "Incomplete analysis acknowledged. No simulated action was executed."
+                if acknowledgement_only and execution_count == 0
+                else
                 f"Approved. {execution_count} simulated action executed."
                 if execution_count == 1
                 else f"Approved. {execution_count} simulated actions executed."
@@ -320,6 +326,8 @@ def _render_review(controller: DashboardController) -> None:
     st.markdown("---")
     st.subheader("Human approval required")
     st.warning(request["question"])
+    for reason in request.get("review_reasons", []):
+        st.error(reason["message"], icon="⚠️")
     actions = request.get("proposed_actions", [])
     action_by_id = {action["action_id"]: action for action in actions}
     action_ids = list(action_by_id)
@@ -356,7 +364,7 @@ def _render_review(controller: DashboardController) -> None:
     )
     approve_col, edit_col, reject_col = st.columns(3)
     if approve_col.button(
-        "Approve",
+        "Acknowledge" if not actions else "Approve",
         type="primary",
         width="stretch",
         key=f"approve_{controller.thread_id}",
@@ -391,6 +399,13 @@ def _render_latest_result(controller: DashboardController) -> None:
         return
     st.subheader("Latest StayOps response")
     st.caption(controller.last_query)
+    warning = (
+        incomplete_analysis_message(result)
+        if result is not controller.daily_result
+        else None
+    )
+    if warning:
+        st.error(warning, icon="⚠️")
     st.write(result.get("final_response") or "The workflow returned no narrative response.")
     if result.get("executed_actions"):
         for execution in result["executed_actions"]:
@@ -452,6 +467,10 @@ def main() -> None:
     )
     metric_columns[1].metric("Watch", counts[PropertyHealth.WATCH])
     metric_columns[2].metric("Ready", counts[PropertyHealth.READY])
+
+    daily_warning = incomplete_analysis_message(daily_result)
+    if daily_warning:
+        st.error(daily_warning, icon="⚠️")
 
     with st.sidebar:
         st.markdown("### Portfolio view")

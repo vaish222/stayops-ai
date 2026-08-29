@@ -3,7 +3,7 @@
   "name": "Persistent guest-message failure escalates safely",
   "category": "tool_failure",
   "passed": true,
-  "latency_ms": 2.352,
+  "latency_ms": 3.24,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -42,14 +42,18 @@
       "expected": {
         "overall_status": "no_findings",
         "required_categories": [],
-        "requires_human_review": false,
-        "review_reasons": []
+        "requires_human_review": true,
+        "review_reasons": [
+          "source_data_unavailable"
+        ]
       },
       "observed": {
         "overall_status": "no_findings",
         "categories": [],
-        "requires_human_review": false,
-        "review_reasons": [],
+        "requires_human_review": true,
+        "review_reasons": [
+          "source_data_unavailable"
+        ],
         "checks": {
           "overall_status": true,
           "required_categories": true,
@@ -63,7 +67,7 @@
       "metric": "approval_enforcement",
       "applicable": true,
       "passed": true,
-      "expected": "no_write",
+      "expected": "pause_without_execution",
       "observed": {
         "pre_approval_execution_count": 0,
         "final_execution_count": 0
@@ -93,9 +97,20 @@
               "failures_before_success": 2
             }
           }
-        ]
+        ],
+        "analysis_complete": false,
+        "unavailable_sources": [
+          "get_guest_messages"
+        ],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "source_data_unavailable"
+        ],
+        "fabricated_claims": [],
+        "final_response": "Analysis incomplete: guest messages remained unavailable after retry. Findings are partial; absence of findings is not an all-clear.\n\nNo structured specialist findings were supplied.",
+        "execution_count": 0
       },
-      "details": "Retry must recover once or safely escalate after exactly two attempts."
+      "details": "Retry must recover once or explicitly mark incomplete analysis, avoid unsupported claims, pause for review, and execute no write."
     },
     {
       "metric": "latency",
@@ -105,7 +120,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 2.352
+        "latency_ms": 3.24
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -134,14 +149,21 @@
       "guest"
     ],
     "overall_status": "no_findings",
+    "analysis_complete": false,
+    "unavailable_sources": [
+      "get_guest_messages"
+    ],
+    "final_response": "Analysis incomplete: guest messages remained unavailable after retry. Findings are partial; absence of findings is not an all-clear.\n\nNo structured specialist findings were supplied.",
     "finding_categories": [],
-    "requires_human_review": false,
-    "review_reason_codes": [],
+    "requires_human_review": true,
+    "review_reason_codes": [
+      "source_data_unavailable"
+    ],
     "agent_runs": [
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.094,
+        "latency_ms": 0.112,
         "finding_count": 0,
         "warning_count": 1,
         "analyzed_record_count": 0,

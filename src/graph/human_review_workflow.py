@@ -36,12 +36,20 @@ def _review_request(
 ) -> dict[str, Any]:
     prior_decision = state["human_decision"] or {}
     reconfirming_edit = prior_decision.get("decision") == ReviewDecision.EDIT
+    source_failure_only = bool(state["unavailable_sources"]) and not state[
+        "proposed_actions"
+    ]
     request = HumanReviewRequest(
         request_id=state["request_id"],
         question=(
             "Reconfirm the edited proposal: approve, edit again, or reject?"
             if reconfirming_edit
-            else "Review the proposal and evidence: approve, edit, or reject?"
+            else (
+                "Required operational data is unavailable. Acknowledge the "
+                "incomplete analysis or reject it?"
+                if source_failure_only
+                else "Review the proposal and evidence: approve, edit, or reject?"
+            )
         ),
         proposed_actions=state["proposed_actions"],
         findings=state["operational_findings"],

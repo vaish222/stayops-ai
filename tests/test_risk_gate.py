@@ -22,6 +22,7 @@ from src.models import (
     WriteToolName,
 )
 from src.safety import RiskActionGate
+from src.tools import FailureSimulator, ReadToolName, SimulatedFailureConfig
 
 
 REFERENCE_DATE = date(2026, 8, 28)
@@ -88,10 +89,12 @@ def evaluate(
     findings: list[SpecialistFinding] | None = None,
     actions: list[ProposedAction] | None = None,
     gate: RiskActionGate | None = None,
+    unavailable_sources: list[str] | None = None,
 ):
     return (gate or RiskActionGate()).evaluate(
         RiskGateInput(
             write_requested=write_requested,
+            unavailable_sources=unavailable_sources or [],
             specialist_findings=findings or [],
             prioritized_findings=[],
             proposed_actions=actions or [],
@@ -122,6 +125,15 @@ def test_router_write_intent_requires_review_with_explicit_reason() -> None:
     assert output.requires_human_review is True
     assert reason_codes(output) == [ReviewReasonCode.WRITE_REQUESTED]
     assert output.reasons[0].source_ids == ["router:write_requested"]
+
+
+def test_unavailable_source_requires_review_with_explicit_reason() -> None:
+    output = evaluate(unavailable_sources=["get_guest_messages"])
+
+    assert output.requires_human_review is True
+    assert reason_codes(output) == [ReviewReasonCode.SOURCE_DATA_UNAVAILABLE]
+    assert output.reasons[0].source_ids == ["get_guest_messages"]
+    assert "partial" in output.reasons[0].message
 
 
 @pytest.mark.parametrize(
@@ -314,6 +326,37 @@ def test_phase_6_graph_preserves_safe_read_only_path() -> None:
     assert result["risk_gate_evaluated"] is True
     assert result["requires_human_review"] is False
     assert result["review_reasons"] == []
+    assert result["executed_actions"] == []
+
+
+def test_phase_6_persistent_source_failure_is_explicitly_escalated() -> None:
+    simulator = FailureSimulator(
+        SimulatedFailureConfig(
+            failures_before_success={ReadToolName.GET_GUEST_MESSAGES: 2}
+        )
+    )
+    graph = build_phase_6_graph(
+        reference_date=REFERENCE_DATE,
+        failure_simulator=simulator,
+    )
+
+    result = graph.invoke(
+        create_initial_state(
+            "Are there unresolved guest issues today?",
+            request_id="phase-6-source-unavailable",
+        )
+    )
+
+    assert result["analysis_complete"] is False
+    assert result["unavailable_sources"] == ["get_guest_messages"]
+    assert result["requires_human_review"] is True
+    assert [reason["code"] for reason in result["review_reasons"]] == [
+        ReviewReasonCode.SOURCE_DATA_UNAVAILABLE
+    ]
+    assert result["guest_findings"] == []
+    assert result["operational_findings"] == []
+    assert result["final_response"].startswith("Analysis incomplete:")
+    assert "not an all-clear" in result["final_response"]
     assert result["executed_actions"] == []
 
 

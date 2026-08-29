@@ -102,6 +102,8 @@ def test_retryable_context_failure_recovers_before_specialist_runs() -> None:
 
     assert simulator.attempt_count(ReadToolName.GET_GUEST_MESSAGES) == 2
     assert result["errors"] == []
+    assert result["analysis_complete"] is True
+    assert result["unavailable_sources"] == []
     assert len(result["guest_findings"]) == 1
     assert result["agent_runs"][0]["warning_count"] == 0
 
@@ -121,6 +123,8 @@ def test_persistent_context_failure_is_isolated_and_reported() -> None:
     assert simulator.attempt_count(ReadToolName.GET_GUEST_MESSAGES) == 2
     assert result["guest_message_context"] == {}
     assert result["guest_findings"] == []
+    assert result["analysis_complete"] is False
+    assert result["unavailable_sources"] == ["get_guest_messages"]
     assert result["agent_runs"][0]["status"] == "succeeded"
     assert result["agent_runs"][0]["warning_count"] == 1
     assert len(result["errors"]) == 1
@@ -128,6 +132,25 @@ def test_persistent_context_failure_is_isolated_and_reported() -> None:
     assert error["stage"] == "context_loading"
     assert error["tool_name"] == "get_guest_messages"
     assert error["attempts"] == 2
+
+
+@pytest.mark.parametrize("tool_name", list(ReadToolName))
+def test_each_persistent_required_source_marks_analysis_incomplete(
+    tool_name: ReadToolName,
+) -> None:
+    simulator = FailureSimulator(
+        SimulatedFailureConfig(failures_before_success={tool_name: 2})
+    )
+
+    result = invoke_graph(
+        "What needs my attention today?",
+        failure_simulator=simulator,
+    )
+
+    assert simulator.attempt_count(tool_name) == 2
+    assert result["analysis_complete"] is False
+    assert result["unavailable_sources"] == [tool_name.value]
+    assert [error["tool_name"] for error in result["errors"]] == [tool_name.value]
 
 
 class FailingRunner:

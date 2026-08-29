@@ -9,6 +9,7 @@ from src.ui.dashboard import (
     build_property_summaries,
     count_property_health,
     evidence_for_action,
+    incomplete_analysis_message,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "build_property_summaries",
     "count_property_health",
     "evidence_for_action",
+    "incomplete_analysis_message",
 ]

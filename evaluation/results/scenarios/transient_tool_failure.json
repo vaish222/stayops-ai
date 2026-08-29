@@ -3,7 +3,7 @@
   "name": "Transient guest-message failure recovers on retry",
   "category": "tool_failure",
   "passed": true,
-  "latency_ms": 2.53,
+  "latency_ms": 3.144,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -87,9 +87,18 @@
         "attempts": {
           "get_guest_messages": 2
         },
-        "context_errors": []
+        "context_errors": [],
+        "analysis_complete": true,
+        "unavailable_sources": [],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "message_send"
+        ],
+        "fabricated_claims": [],
+        "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
+        "execution_count": 0
       },
-      "details": "Retry must recover once or safely escalate after exactly two attempts."
+      "details": "Retry must recover once or explicitly mark incomplete analysis, avoid unsupported claims, pause for review, and execute no write."
     },
     {
       "metric": "latency",
@@ -99,7 +108,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 2.53
+        "latency_ms": 3.144
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -128,6 +137,9 @@
       "guest"
     ],
     "overall_status": "needs_attention",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
     "finding_categories": [
       "guest_maintenance_report"
     ],
@@ -139,7 +151,7 @@
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.103,
+        "latency_ms": 0.151,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 1,

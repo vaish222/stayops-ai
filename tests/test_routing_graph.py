@@ -23,6 +23,8 @@ def test_initial_state_populates_every_declared_field() -> None:
     assert state["property_scope"] == []
     assert state["human_decision"] is None
     assert state["requires_human_review"] is False
+    assert state["analysis_complete"] is True
+    assert state["unavailable_sources"] == []
     assert state["final_response"] == ""
 
 

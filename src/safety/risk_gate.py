@@ -73,6 +73,18 @@ class RiskActionGate:
         )
         reasons: list[HumanReviewReason] = []
 
+        if context.unavailable_sources:
+            reasons.append(
+                HumanReviewReason(
+                    code=ReviewReasonCode.SOURCE_DATA_UNAVAILABLE,
+                    message=(
+                        "Required source data remained unavailable after retry. "
+                        "The findings are partial and require human review."
+                    ),
+                    source_ids=context.unavailable_sources,
+                )
+            )
+
         if context.write_requested:
             reasons.append(
                 HumanReviewReason(

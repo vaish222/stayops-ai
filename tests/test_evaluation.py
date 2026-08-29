@@ -72,6 +72,17 @@ def test_tool_failures_show_retry_recovery_and_safe_escalation() -> None:
     )
     assert persistent_metric.observed["attempts"] == {"get_guest_messages": 2}
     assert persistent_metric.observed["context_errors"][0]["attempts"] == 2
+    assert persistent_metric.observed["analysis_complete"] is False
+    assert persistent_metric.observed["unavailable_sources"] == [
+        "get_guest_messages"
+    ]
+    assert persistent_metric.observed["requires_human_review"] is True
+    assert persistent_metric.observed["review_reason_codes"] == [
+        "source_data_unavailable"
+    ]
+    assert persistent_metric.observed["fabricated_claims"] == []
+    assert persistent_metric.observed["execution_count"] == 0
+    assert "not an all-clear" in persistent_metric.observed["final_response"]
     assert persistent.observations["finding_categories"] == []
 
 

@@ -3,7 +3,7 @@
   "name": "Confirmed same-day turnover remains on watch",
   "category": "same_day_turnover",
   "passed": true,
-  "latency_ms": 3.368,
+  "latency_ms": 3.795,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -101,7 +101,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 3.368
+        "latency_ms": 3.795
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -133,6 +133,9 @@
       "turnover"
     ],
     "overall_status": "watch",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "Overall status: watch. 1 prioritized item across 1 affected property.",
     "finding_categories": [
       "arrival",
       "departure",
@@ -146,7 +149,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.166,
+        "latency_ms": 0.197,
         "finding_count": 4,
         "warning_count": 0,
         "analyzed_record_count": 2,
@@ -155,7 +158,7 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.15,
+        "latency_ms": 0.173,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 3,

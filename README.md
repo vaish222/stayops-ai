@@ -66,11 +66,13 @@ queries run all four specialists concurrently; domain queries run the smallest
 useful specialist set.
 
 Retryable read failures are retried once. Persistent source failures become
-structured workflow errors without fabricated findings, while an exception in
-one specialist branch is caught so its parallel peers can still complete. Each
-run records the agents selected, status, latency, finding count, warning count,
-and analyzed-record count. Specialist outputs merge into their dedicated
-`StayOpsState` fields. Synthesis and human review are not part of this phase.
+structured workflow errors without fabricated findings and set
+`analysis_complete=False` with the exact names in `unavailable_sources`, while
+an exception in one specialist branch is caught so its parallel peers can still
+complete. Each run records the agents selected, status, latency, finding count,
+warning count, and analyzed-record count. Specialist outputs merge into their
+dedicated `StayOpsState` fields. Synthesis and human review are not part of this
+phase.
 
 ## Phase 5: operations synthesis
 
@@ -96,6 +98,7 @@ action proposals, and the router's write-intent flag. It sets
 - high- or critical-severity maintenance findings;
 - confidence below the configurable `0.75` default threshold;
 - contradictory turnover findings about the same property and source record;
+- required source data that remains unavailable after its retry;
 - any request the router classifies as potentially write-producing.
 
 Drafts and read-only review proposals remain safe unless another rule applies.
@@ -130,7 +133,8 @@ completed = graph.invoke(
 )
 ```
 
-Approve and Reject complete the review. Edit can change only a selected
+Approve and Reject complete the review. A source-failure review with no action
+can be acknowledged or rejected and never reaches a write tool. Edit can change only a selected
 proposal's description, preserves its type and evidence links, and pauses again
 for reconfirmation. Invalid responses remain interrupted with a validation
 message. Phase 7 records decisions but contains no write tools or action
@@ -181,6 +185,10 @@ and workflow errors for debugging. Approval capability values are intentionally
 excluded from this view. The dashboard uses the fixed synthetic operating date
 `2026-08-28`.
 
+If a required read source remains unavailable, the dashboard shows an
+incomplete-analysis warning outside debug mode, explains that findings are
+partial, and never presents an unverified property as Ready.
+
 Run the dashboard locally with:
 
 ```bash
@@ -206,9 +214,14 @@ write.
 Each scenario records routing, specialist activation, status/risk behavior,
 approval enforcement, safe failure recovery, end-to-end latency, and any
 critical operational claims whose cited records are absent from loaded context.
+Persistent-failure grading requires exactly two attempts, explicit incomplete
+state, a source-unavailable review reason, a host-facing warning, no claim based
+on the missing source, and no write execution.
 Metrics are aggregated against the product requirements without lowering their
 thresholds. The five-minute target is reported as automated workflow latency;
-it is a proxy and not a human usability study.
+it is a proxy and not a human usability study. Use the
+[`evaluation/usability_protocol.md`](evaluation/usability_protocol.md) runbook
+to collect the human timing evidence separately.
 
 Run the suite and refresh the saved JSON reports with:
 
@@ -220,3 +233,16 @@ Outputs are saved as `evaluation/results/scenario_results.json`, one diagnostic
 file per scenario under `evaluation/results/scenarios/`, and
 `evaluation/results/aggregate_report.json`. The command exits non-zero if an
 aggregate target is missed.
+
+## Definition-of-done demo
+
+Use this short runbook to cover the required demo paths:
+
+1. Start the dashboard and ask, “Which guests are arriving at City Loft
+   today?” for the happy path.
+2. Return to the daily briefing, inspect the Lake House cleaner issue and its
+   evidence, then Approve, Edit, or Reject the proposed simulated action.
+3. Run `uv run python -m src.evaluation.runner` and inspect
+   `evaluation/results/scenarios/persistent_tool_failure.json` for the
+   two-attempt tool failure, incomplete-analysis escalation, review pause, and
+   zero executions.

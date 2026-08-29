@@ -11,6 +11,7 @@ from src.models.synthesis import PrioritizedFinding, ProposedAction
 
 
 class ReviewReasonCode(StrEnum):
+    SOURCE_DATA_UNAVAILABLE = "source_data_unavailable"
     WRITE_REQUESTED = "write_requested"
     MESSAGE_SEND = "message_send"
     RESERVATION_MODIFICATION = "reservation_modification"
@@ -31,9 +32,22 @@ class RiskGateConfig(StrictModel):
 
 class RiskGateInput(StrictModel):
     write_requested: bool = False
+    unavailable_sources: list[str] = Field(default_factory=list)
     specialist_findings: list[SpecialistFinding]
     prioritized_findings: list[PrioritizedFinding]
     proposed_actions: list[ProposedAction]
+
+    @field_validator("unavailable_sources")
+    @classmethod
+    def unavailable_sources_must_be_unique_and_nonblank(
+        cls,
+        sources: list[str],
+    ) -> list[str]:
+        if any(not source.strip() for source in sources):
+            raise ValueError("unavailable source names must be nonblank")
+        if len(sources) != len(set(sources)):
+            raise ValueError("unavailable source names must be unique")
+        return sources
 
     @field_validator("specialist_findings")
     @classmethod

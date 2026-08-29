@@ -9,6 +9,7 @@ from langgraph.types import Command
 
 from src.graph import build_phase_8_graph, create_initial_state
 from src.models import WriteToolName
+from src.tools import FailureSimulator, ReadToolName, SimulatedFailureConfig
 
 
 REFERENCE_DATE = date(2026, 8, 28)
@@ -191,6 +192,38 @@ def test_safe_read_path_never_reaches_write_execution() -> None:
 
     assert "__interrupt__" not in completed
     assert completed["requires_human_review"] is False
+    assert completed["approval_grants"] == []
+    assert completed["action_attempts"] == []
+    assert completed["executed_actions"] == []
+
+
+def test_source_failure_review_can_be_acknowledged_without_a_write() -> None:
+    simulator = FailureSimulator(
+        SimulatedFailureConfig(
+            failures_before_success={ReadToolName.GET_GUEST_MESSAGES: 2}
+        )
+    )
+    graph = build_phase_8_graph(
+        reference_date=REFERENCE_DATE,
+        failure_simulator=simulator,
+    )
+    config, paused, request = start_review(
+        graph,
+        query="Are there unresolved guest issues today?",
+        thread_id="phase-8-source-unavailable",
+    )
+
+    assert paused["analysis_complete"] is False
+    assert request["proposed_actions"] == []
+    assert request["review_reasons"][0]["code"] == "source_data_unavailable"
+    assert request["question"].startswith("Required operational data is unavailable")
+
+    completed = graph.invoke(
+        Command(resume={"decision": "approve"}),
+        config=config,
+    )
+
+    assert completed["human_decision"]["action_ids"] == []
     assert completed["approval_grants"] == []
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []

@@ -139,11 +139,13 @@
     "expected_specialists": ["guest"],
     "expected_status": "no_findings",
     "required_categories": [],
-    "expected_requires_review": false,
-    "expected_review_reasons": [],
+    "expected_requires_review": true,
+    "expected_review_reasons": [
+      "source_data_unavailable"
+    ],
     "failure_plan": {"get_guest_messages": 2},
     "failure_expectation": "safe_escalation",
-    "write_expectation": "no_write",
+    "write_expectation": "pause_without_execution",
     "inject_conflict": false
   },
   {

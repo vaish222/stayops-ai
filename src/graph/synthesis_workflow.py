@@ -35,6 +35,17 @@ class SynthesisRunner(Protocol):
     def invoke(self, payload: dict[str, Any]) -> OperationsSynthesisOutput: ...
 
 
+def _incomplete_analysis_warning(unavailable_sources: list[str]) -> str:
+    readable_sources = ", ".join(
+        source.removeprefix("get_").replace("_", " ")
+        for source in unavailable_sources
+    )
+    return (
+        f"Analysis incomplete: {readable_sources} remained unavailable after retry. "
+        "Findings are partial; absence of findings is not an all-clear."
+    )
+
+
 def operations_synthesizer_node(
     state: StayOpsState,
     *,
@@ -60,19 +71,31 @@ def operations_synthesizer_node(
             retryable=False,
             details={"exception_type": type(exc).__name__},
         )
+        response = "Operations synthesis is unavailable."
+        if state["unavailable_sources"]:
+            response = (
+                f"{_incomplete_analysis_warning(state['unavailable_sources'])}\n\n"
+                f"{response}"
+            )
         return {
             "overall_status": "",
             "action_proposed": False,
             "operational_findings": [],
             "priority_items": [],
             "proposed_actions": [],
-            "final_response": "Operations synthesis is unavailable.",
+            "final_response": response,
             "errors": [error],
         }
 
     serialized_findings = [
         finding.model_dump(mode="json") for finding in output.prioritized_findings
     ]
+    response = output.briefing
+    if state["unavailable_sources"]:
+        response = (
+            f"{_incomplete_analysis_warning(state['unavailable_sources'])}\n\n"
+            f"{response}"
+        )
     return {
         "overall_status": output.overall_status.value,
         "action_proposed": output.action_proposed,
@@ -85,7 +108,7 @@ def operations_synthesizer_node(
         "proposed_actions": [
             action.model_dump(mode="json") for action in output.proposed_actions
         ],
-        "final_response": output.briefing,
+        "final_response": response,
     }
 
 

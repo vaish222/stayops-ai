@@ -6,12 +6,42 @@ from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
 
+from src.graph import build_phase_8_graph
+from src.tools import FailureSimulator, ReadToolName, SimulatedFailureConfig
+from src.ui import DashboardController, OPERATING_DATE
+
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
 
 def render_app() -> AppTest:
     return AppTest.from_file(APP_PATH, default_timeout=10).run()
+
+
+class FailureOnlyDashboardController(DashboardController):
+    def load_daily_briefing(self) -> dict:
+        result = self.run_query("Are there unresolved guest issues today?")
+        self.daily_result = result
+        self.daily_thread_id = self.thread_id
+        return result
+
+
+def render_failure_app() -> AppTest:
+    simulator = FailureSimulator(
+        SimulatedFailureConfig(
+            failures_before_success={ReadToolName.GET_GUEST_MESSAGES: 2}
+        )
+    )
+    controller = FailureOnlyDashboardController(
+        graph=build_phase_8_graph(
+            reference_date=OPERATING_DATE,
+            failure_simulator=simulator,
+        ),
+        thread_id_factory=lambda: "dashboard-source-unavailable",
+    )
+    app = AppTest.from_file(APP_PATH, default_timeout=10)
+    app.session_state["stayops_controller"] = controller
+    return app.run()
 
 
 def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
@@ -123,3 +153,25 @@ def test_reject_control_records_decision_without_execution() -> None:
     assert controller.result["human_decision"]["decision"] == "reject"
     assert controller.result["executed_actions"] == []
     assert any("No action was executed" in item.value for item in app.info)
+
+
+def test_source_failure_is_prominent_and_requires_acknowledgement() -> None:
+    app = render_failure_app()
+
+    assert app.exception == []
+    assert any("Analysis incomplete" in item.value for item in app.error)
+    assert any("findings are partial" in item.value.lower() for item in app.error)
+    assert "Acknowledge" in {button.label for button in app.button}
+    assert [(metric.label, metric.value) for metric in app.metric[:3]] == [
+        ("Need attention", "0"),
+        ("Watch", "8"),
+        ("Ready", "0"),
+    ]
+
+    app = next(
+        button for button in app.button if button.label == "Acknowledge"
+    ).click().run()
+
+    controller = app.session_state["stayops_controller"]
+    assert controller.result["executed_actions"] == []
+    assert any("No simulated action was executed" in item.value for item in app.success)

@@ -9,6 +9,7 @@ from src.ui import (
     build_property_summaries,
     count_property_health,
     evidence_for_action,
+    incomplete_analysis_message,
 )
 
 
@@ -115,3 +116,36 @@ def test_controller_resumes_approval_on_same_thread_and_exposes_execution() -> N
         WriteToolName.SEND_CLEANER_MESSAGE
     )
     assert controller.daily_result == completed
+
+
+def test_incomplete_analysis_message_names_sources_and_rejects_false_all_clear() -> None:
+    assert incomplete_analysis_message(
+        {
+            "analysis_complete": False,
+            "unavailable_sources": ["get_guest_messages"],
+        }
+    ) == (
+        "Analysis incomplete: guest messages remained unavailable after retry. "
+        "Findings are partial; absence of findings is not an all-clear."
+    )
+    assert incomplete_analysis_message(
+        {"analysis_complete": True, "unavailable_sources": []}
+    ) is None
+
+
+def test_incomplete_analysis_does_not_mark_unverified_properties_ready() -> None:
+    result = {
+        "analysis_complete": False,
+        "property_context": {
+            "prop_test_house": {
+                "name": "Test House",
+                "location": "Testville",
+            }
+        },
+        "operational_findings": [],
+    }
+
+    summary = build_property_summaries(result)[0]
+
+    assert summary.health == PropertyHealth.WATCH
+    assert summary.headline == "Analysis incomplete; verify unavailable source data."

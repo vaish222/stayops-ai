@@ -37,6 +37,22 @@ class PropertySummary:
 SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
 
+def incomplete_analysis_message(result: dict[str, Any]) -> str | None:
+    """Return a host-facing warning when required source data was unavailable."""
+
+    sources = result.get("unavailable_sources", [])
+    if result.get("analysis_complete", True) and not sources:
+        return None
+    readable_sources = ", ".join(
+        str(source).removeprefix("get_").replace("_", " ")
+        for source in sources
+    ) or "required operational data"
+    return (
+        f"Analysis incomplete: {readable_sources} remained unavailable after retry. "
+        "Findings are partial; absence of findings is not an all-clear."
+    )
+
+
 def _attention_findings(
     result: dict[str, Any],
     property_id: str,
@@ -60,6 +76,7 @@ def build_property_summaries(result: dict[str, Any]) -> list[PropertySummary]:
     """Derive one stable operational health summary per loaded property."""
 
     summaries: list[PropertySummary] = []
+    analysis_incomplete = not result.get("analysis_complete", True)
     for property_id, property_record in result.get("property_context", {}).items():
         findings = _attention_findings(result, property_id)
         highest_rank = max(
@@ -73,6 +90,8 @@ def build_property_summaries(result: dict[str, Any]) -> list[PropertySummary]:
             health = PropertyHealth.NEEDS_ATTENTION
         elif findings:
             health = PropertyHealth.WATCH
+        elif analysis_incomplete:
+            health = PropertyHealth.WATCH
         else:
             health = PropertyHealth.READY
         summaries.append(
@@ -85,7 +104,11 @@ def build_property_summaries(result: dict[str, Any]) -> list[PropertySummary]:
                 headline=(
                     findings[0].get("summary", "Operational review required.")
                     if findings
-                    else "No active issues in today's briefing."
+                    else (
+                        "Analysis incomplete; verify unavailable source data."
+                        if analysis_incomplete
+                        else "No active issues in today's briefing."
+                    )
                 ),
             )
         )

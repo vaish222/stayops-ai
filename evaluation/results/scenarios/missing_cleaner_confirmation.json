@@ -3,7 +3,7 @@
   "name": "Unconfirmed cleaner elevates Lake House turnover",
   "category": "missing_cleaner_confirmation",
   "passed": true,
-  "latency_ms": 3.268,
+  "latency_ms": 4.008,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -105,7 +105,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 3.268
+        "latency_ms": 4.008
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -137,6 +137,9 @@
       "turnover"
     ],
     "overall_status": "needs_attention",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
     "finding_categories": [
       "arrival",
       "cleaner_confirmation_missing",
@@ -152,7 +155,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.134,
+        "latency_ms": 0.186,
         "finding_count": 4,
         "warning_count": 0,
         "analyzed_record_count": 2,
@@ -161,7 +164,7 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.125,
+        "latency_ms": 0.142,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 3,

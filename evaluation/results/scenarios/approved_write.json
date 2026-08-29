@@ -3,7 +3,7 @@
   "name": "Reviewed cleaner message executes after explicit approval",
   "category": "approved_write",
   "passed": true,
-  "latency_ms": 3.59,
+  "latency_ms": 4.94,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -105,7 +105,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 3.59
+        "latency_ms": 4.94
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -137,6 +137,9 @@
       "turnover"
     ],
     "overall_status": "needs_attention",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
     "finding_categories": [
       "arrival",
       "cleaner_confirmation_missing",
@@ -152,7 +155,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.142,
+        "latency_ms": 0.193,
         "finding_count": 4,
         "warning_count": 0,
         "analyzed_record_count": 2,
@@ -161,7 +164,7 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.127,
+        "latency_ms": 0.133,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 3,
@@ -171,7 +174,7 @@
     "errors": [],
     "action_attempts": [
       {
-        "attempt_id": "034688e7-7d3e-42e8-b1a8-a3ae440381cc",
+        "attempt_id": "00e34561-5890-4e43-8cce-43b9f7f68db0",
         "tool_name": "send_cleaner_message",
         "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
         "property_id": "prop_lake_house",
@@ -184,7 +187,7 @@
     ],
     "executed_actions": [
       {
-        "execution_id": "7b81daae-e2eb-4230-b596-09ca2e1ef38f",
+        "execution_id": "6f24532e-72a5-413f-af0a-cd02b63f5dbe",
         "tool_name": "send_cleaner_message",
         "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
         "property_id": "prop_lake_house",
