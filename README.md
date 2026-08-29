@@ -58,6 +58,20 @@ The specialists are read-only analyzers: they cannot send messages, modify
 reservations, update tickets, or execute any other operational action. They are
 not connected to the LangGraph workflow until the parallel orchestration phase.
 
+## Phase 4: parallel LangGraph workflow
+
+The Phase 4 graph routes each request, loads only the required read context,
+and conditionally fans out to the relevant specialists. Broad briefing and risk
+queries run all four specialists concurrently; domain queries run the smallest
+useful specialist set.
+
+Retryable read failures are retried once. Persistent source failures become
+structured workflow errors without fabricated findings, while an exception in
+one specialist branch is caught so its parallel peers can still complete. Each
+run records the agents selected, status, latency, finding count, warning count,
+and analyzed-record count. Specialist outputs merge into their dedicated
+`StayOpsState` fields. Synthesis and human review are not part of this phase.
+
 Install and validate with:
 
 ```bash
