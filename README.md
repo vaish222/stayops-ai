@@ -72,6 +72,20 @@ run records the agents selected, status, latency, finding count, warning count,
 and analyzed-record count. Specialist outputs merge into their dedicated
 `StayOpsState` fields. Synthesis and human review are not part of this phase.
 
+## Phase 5: operations synthesis
+
+After all selected specialist branches finish, one deferred Operations
+Synthesizer receives only their structured findings. It preserves source
+evidence, combines explicitly related cross-agent findings, assigns stable
+priority ranks, derives an overall status, identifies affected properties, and
+records recommended actions as unexecuted proposals.
+
+The cross-agent combination requires shared record evidence. For example, Lake
+House's same-day booking turnover and missing cleaner confirmation combine
+because both cite the same reservations. Same-property findings with unrelated
+evidence remain separate. Risk gating, approval, and action execution are not
+implemented in Phase 5.
+
 Install and validate with:
 
 ```bash

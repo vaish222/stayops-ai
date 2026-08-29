@@ -33,6 +33,13 @@ from src.models.operations import (
     ReservationStatus,
     StayOpsDataset,
 )
+from src.models.synthesis import (
+    OperationsSynthesisInput,
+    OperationsSynthesisOutput,
+    OverallStatus,
+    PrioritizedFinding,
+    ProposedAction,
+)
 
 __all__ = [
     "AgentSourceError",
@@ -54,8 +61,13 @@ __all__ = [
     "MessageCategory",
     "MessageDirection",
     "MessageUrgency",
+    "OperationsSynthesisInput",
+    "OperationsSynthesisOutput",
+    "OverallStatus",
     "Property",
     "PropertyRule",
+    "PrioritizedFinding",
+    "ProposedAction",
     "Reservation",
     "ReservationStatus",
     "StayOpsDataset",

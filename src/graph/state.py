@@ -18,7 +18,7 @@ class AgentRunLog(TypedDict):
 
 
 class WorkflowError(TypedDict, total=False):
-    stage: Literal["context_loading", "specialist_execution"]
+    stage: Literal["context_loading", "specialist_execution", "synthesis_execution"]
     code: str
     message: str
     component: str
@@ -48,6 +48,8 @@ class StayOpsState(TypedDict):
     operational_findings: list[dict[str, Any]]
     priority_items: list[dict[str, Any]]
     proposed_actions: list[dict[str, Any]]
+    overall_status: str
+    action_proposed: bool
     requires_human_review: bool
     human_decision: dict[str, Any] | None
     executed_actions: list[dict[str, Any]]
@@ -79,6 +81,8 @@ def create_initial_state(host_query: str, request_id: str | None = None) -> Stay
         operational_findings=[],
         priority_items=[],
         proposed_actions=[],
+        overall_status="",
+        action_proposed=False,
         requires_human_review=False,
         human_decision=None,
         executed_actions=[],
