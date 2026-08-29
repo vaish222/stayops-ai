@@ -9,6 +9,7 @@ from typing import Any
 import streamlit as st
 
 from src.agents.response_generator import format_stayops_response
+from src.time_context import current_operating_date
 from src.ui import (
     DEFAULT_DAILY_QUERY,
     DashboardController,
@@ -196,7 +197,7 @@ def _controller() -> DashboardController:
     if "stayops_controller" not in st.session_state:
         st.session_state.stayops_controller = DashboardController()
     controller: DashboardController = st.session_state.stayops_controller
-    if controller.daily_result is None:
+    if controller.daily_briefing_needs_refresh:
         controller.load_daily_briefing()
     return controller
 
@@ -1280,7 +1281,7 @@ def main() -> None:
         activity_mode = st.toggle("Agent Activity", value=False)
         st.caption(
             f"Operating date · "
-            f"{_format_date(daily_result.get('date_scope', '2026-08-28'))}"
+            f"{_format_date(daily_result.get('date_scope') or current_operating_date().isoformat())}"
         )
         st.markdown("---")
         st.caption("Synthetic operations data · simulated writes only")

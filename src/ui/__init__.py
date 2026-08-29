@@ -2,7 +2,6 @@
 
 from src.ui.dashboard import (
     DEFAULT_DAILY_QUERY,
-    OPERATING_DATE,
     DashboardController,
     PropertyHealth,
     PropertySummary,
@@ -14,7 +13,6 @@ from src.ui.dashboard import (
 
 __all__ = [
     "DEFAULT_DAILY_QUERY",
-    "OPERATING_DATE",
     "DashboardController",
     "PropertyHealth",
     "PropertySummary",

@@ -12,10 +12,10 @@ from uuid import uuid4
 from langgraph.types import Command
 
 from src.graph import build_phase_8_graph, create_initial_state
+from src.time_context import current_operating_date
 from src.tools import SimulatedOperationsStore
 
 
-OPERATING_DATE = date(2026, 8, 28)
 DEFAULT_DAILY_QUERY = "What needs my attention today?"
 
 
@@ -156,16 +156,21 @@ class DashboardController:
         self,
         *,
         graph: Any | None = None,
-        reference_date: date = OPERATING_DATE,
+        reference_date: date | None = None,
         thread_id_factory: Callable[[], str] | None = None,
         runtime_store: SimulatedOperationsStore | None = None,
     ) -> None:
-        self.runtime_store = runtime_store or SimulatedOperationsStore(
-            clock=lambda: datetime.combine(
-                reference_date,
-                time(hour=23, minute=59),
-                tzinfo=timezone.utc,
+        self.reference_date = reference_date
+        self.runtime_store = runtime_store or (
+            SimulatedOperationsStore(
+                clock=lambda: datetime.combine(
+                    reference_date,
+                    time(hour=23, minute=59),
+                    tzinfo=timezone.utc,
+                )
             )
+            if reference_date is not None
+            else SimulatedOperationsStore()
         )
         self.graph = (
             graph
@@ -191,6 +196,15 @@ class DashboardController:
         self.daily_result = result
         self.daily_thread_id = self.thread_id
         return result
+
+    @property
+    def daily_briefing_needs_refresh(self) -> bool:
+        """Return whether a dynamic dashboard briefing belongs to an older day."""
+
+        if self.daily_result is None:
+            return True
+        expected_date = self.reference_date or current_operating_date()
+        return self.daily_result.get("date_scope") != expected_date.isoformat()
 
     def run_query(
         self,

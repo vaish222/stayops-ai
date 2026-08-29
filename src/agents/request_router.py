@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from src.time_context import current_operating_date, resolve_date_scope
 
 
 class RequestIntent(StrEnum):
@@ -154,12 +156,12 @@ class RequestRouter:
     ) -> RequestRoute:
         router_input = RouterInput(host_query=host_query)
         normalized_query = router_input.host_query.casefold()
-        today = reference_date or date.today()
+        today = reference_date or current_operating_date()
 
         return RequestRoute(
             intent=self._extract_intent(normalized_query),
             property_scope=self._extract_property_scope(normalized_query),
-            date_scope=self._extract_date_scope(normalized_query, today),
+            date_scope=resolve_date_scope(normalized_query, today),
             write_requested=self._extract_write_requested(normalized_query),
         )
 
@@ -183,46 +185,3 @@ class RequestRouter:
     @staticmethod
     def _extract_write_requested(query: str) -> bool:
         return any(re.search(pattern, query) for pattern in WRITE_PATTERNS)
-
-    @staticmethod
-    def _extract_date_scope(query: str, reference_date: date) -> str | None:
-        iso_dates = re.findall(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)", query)
-        valid_iso_dates: list[date] = []
-        for value in iso_dates[:2]:
-            try:
-                valid_iso_dates.append(date.fromisoformat(value))
-            except ValueError:
-                continue
-        if len(valid_iso_dates) == 2:
-            start, end = sorted(valid_iso_dates)
-            return f"{start.isoformat()}/{end.isoformat()}"
-        if len(valid_iso_dates) == 1:
-            return valid_iso_dates[0].isoformat()
-
-        if re.search(r"\bday after tomorrow\b", query):
-            return (reference_date + timedelta(days=2)).isoformat()
-        if re.search(r"\btomorrow\b", query):
-            return (reference_date + timedelta(days=1)).isoformat()
-        if re.search(r"\byesterday\b", query):
-            return (reference_date - timedelta(days=1)).isoformat()
-        if re.search(r"\btoday(?:'s)?\b", query):
-            return reference_date.isoformat()
-
-        next_days = re.search(r"\bnext\s+(\d{1,2})\s+days?\b", query)
-        if next_days is not None:
-            days = int(next_days.group(1))
-            if days > 0:
-                end = reference_date + timedelta(days=days)
-                return f"{reference_date.isoformat()}/{end.isoformat()}"
-
-        if re.search(r"\bnext week\b", query):
-            next_monday = reference_date + timedelta(days=7 - reference_date.weekday())
-            next_sunday = next_monday + timedelta(days=6)
-            return f"{next_monday.isoformat()}/{next_sunday.isoformat()}"
-        if re.search(r"\bthis week\b", query):
-            this_sunday = reference_date + timedelta(days=6 - reference_date.weekday())
-            return f"{reference_date.isoformat()}/{this_sunday.isoformat()}"
-        if re.search(r"\bupcoming\b", query):
-            end = reference_date + timedelta(days=7)
-            return f"{reference_date.isoformat()}/{end.isoformat()}"
-        return None

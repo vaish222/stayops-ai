@@ -54,8 +54,10 @@ Six linked JSON fixtures live in `data/`:
 - `maintenance_tickets.json`
 
 Strict Pydantic models validate every record, and every fixture is explicitly
-marked as synthetic. The fixed operating date is **2026-08-28**, keeping tests
-and evaluation scenarios deterministic.
+marked as synthetic. The dashboard resolves relative calendar language against
+the current date in `America/Los_Angeles` (overridable with
+`STAYOPS_TIMEZONE`). Tests and evaluation scenarios inject a fixed reference
+date to remain deterministic.
 
 The dataset includes same-day turnovers, an unconfirmed cleaner, unanswered
 guest messages, guest-impacting and non-blocking maintenance, an early check-in

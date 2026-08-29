@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from tempfile import mkdtemp
+
+import pytest
 
 from src.models import WriteToolName
 from src.tools import SimulatedOperationsStore
@@ -17,9 +20,13 @@ from src.ui import (
 )
 
 
+REFERENCE_DATE = date(2026, 8, 28)
+
+
 def deterministic_controller() -> DashboardController:
     thread_ids = iter(["dashboard-daily", "dashboard-query"])
     return DashboardController(
+        reference_date=REFERENCE_DATE,
         thread_id_factory=lambda: next(thread_ids),
         runtime_store=SimulatedOperationsStore(
             Path(mkdtemp(prefix="stayops-dashboard-test-"))
@@ -52,6 +59,53 @@ def test_daily_dashboard_summarizes_all_eight_properties() -> None:
         "Mountain Retreat",
         "Downtown Suite",
     }
+
+
+def test_default_controller_uses_current_operating_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected_date = date(2026, 8, 29)
+    monkeypatch.setattr(
+        "src.agents.request_router.current_operating_date",
+        lambda: expected_date,
+    )
+    controller = DashboardController(
+        thread_id_factory=lambda: "dynamic-date-test",
+        runtime_store=SimulatedOperationsStore(
+            Path(mkdtemp(prefix="stayops-dynamic-date-test-"))
+        ),
+    )
+
+    result = controller.load_daily_briefing()
+
+    assert result["date_scope"] == expected_date.isoformat()
+
+
+def test_dynamic_daily_briefing_detects_calendar_rollover(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    current_date = [date(2026, 8, 29)]
+    monkeypatch.setattr(
+        "src.agents.request_router.current_operating_date",
+        lambda: current_date[0],
+    )
+    monkeypatch.setattr(
+        "src.ui.dashboard.current_operating_date",
+        lambda: current_date[0],
+    )
+    controller = DashboardController(
+        thread_id_factory=lambda: "rollover-test",
+        runtime_store=SimulatedOperationsStore(
+            Path(mkdtemp(prefix="stayops-rollover-test-"))
+        ),
+    )
+    controller.load_daily_briefing()
+
+    assert controller.daily_briefing_needs_refresh is False
+
+    current_date[0] = date(2026, 8, 30)
+
+    assert controller.daily_briefing_needs_refresh is True
 
 
 def test_property_summary_uses_highest_priority_attention_finding() -> None:

@@ -90,6 +90,24 @@ def test_turnover_query_loads_scoped_booking_and_cleaning_context() -> None:
     assert result["write_requested"] is True
 
 
+def test_weekend_scope_is_applied_to_loaded_context() -> None:
+    graph = build_phase_4_graph(reference_date=date(2026, 8, 29))
+
+    result = graph.invoke(
+        create_initial_state(
+            "What cleaning and turnover work is scheduled this weekend?",
+            request_id="weekend-scope-test",
+        )
+    )
+
+    assert result["date_scope"] == "2026-08-29/2026-08-30"
+    assert result["cleaning_context"]
+    assert all(
+        "2026-08-29" <= item["scheduled_date"] <= "2026-08-30"
+        for item in result["cleaning_context"].values()
+    )
+
+
 def test_retryable_context_failure_recovers_before_specialist_runs() -> None:
     simulator = FailureSimulator(
         SimulatedFailureConfig(

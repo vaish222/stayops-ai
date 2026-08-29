@@ -162,6 +162,32 @@ def test_router_extracts_explicit_iso_date_range(router: RequestRouter) -> None:
     assert route.date_scope == "2026-09-01/2026-09-04"
 
 
+@pytest.mark.parametrize(
+    ("query", "expected_scope"),
+    [
+        ("What happened yesterday?", "2026-08-27"),
+        ("What is happening tomorrow?", "2026-08-29"),
+        ("Who arrives Saturday?", "2026-08-29"),
+        ("Who arrives next Monday?", "2026-08-31"),
+        ("Show operations this weekend.", "2026-08-29/2026-08-30"),
+        ("Show operations next weekend.", "2026-09-05/2026-09-06"),
+        ("Show operations on weekdays.", "2026-08-24/2026-08-28"),
+        ("Show next week's weekdays.", "2026-08-31/2026-09-04"),
+        ("Show today's arrivals.", "2026-08-28"),
+        ("Show today’s arrivals.", "2026-08-28"),
+    ],
+)
+def test_router_understands_relative_calendar_language(
+    router: RequestRouter,
+    query: str,
+    expected_scope: str,
+) -> None:
+    assert (
+        router.route(query, reference_date=REFERENCE_DATE).date_scope
+        == expected_scope
+    )
+
+
 def test_router_rejects_blank_query(router: RequestRouter) -> None:
     with pytest.raises(ValidationError, match="host_query cannot be blank"):
         router.route("   ", reference_date=REFERENCE_DATE)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from tempfile import mkdtemp
 
@@ -16,22 +16,26 @@ from src.tools import (
     SimulatedFailureConfig,
     SimulatedOperationsStore,
 )
-from src.ui import DashboardController, OPERATING_DATE
+from src.ui import DashboardController
 
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
+REFERENCE_DATE = date(2026, 8, 28)
 
 
 def render_app(view: str | None = None) -> AppTest:
     runtime_store = SimulatedOperationsStore(
         Path(mkdtemp(prefix="stayops-ui-test-")),
         clock=lambda: datetime.combine(
-            OPERATING_DATE,
+            REFERENCE_DATE,
             time(hour=23, minute=59),
             tzinfo=timezone.utc,
         ),
     )
-    controller = DashboardController(runtime_store=runtime_store)
+    controller = DashboardController(
+        reference_date=REFERENCE_DATE,
+        runtime_store=runtime_store,
+    )
     app = AppTest.from_file(APP_PATH, default_timeout=10)
     app.session_state["stayops_controller"] = controller
     if view is not None:
@@ -61,12 +65,13 @@ def render_failure_app() -> AppTest:
     )
     controller = FailureOnlyDashboardController(
         graph=build_phase_8_graph(
-            reference_date=OPERATING_DATE,
+            reference_date=REFERENCE_DATE,
             failure_simulator=simulator,
             runtime_store=runtime_store,
         ),
         thread_id_factory=lambda: "dashboard-source-unavailable",
         runtime_store=runtime_store,
+        reference_date=REFERENCE_DATE,
     )
     app = AppTest.from_file(APP_PATH, default_timeout=10)
     app.session_state["stayops_controller"] = controller
