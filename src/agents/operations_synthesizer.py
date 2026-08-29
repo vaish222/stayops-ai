@@ -8,6 +8,7 @@ from langchain_core.runnables import Runnable, RunnableLambda
 
 from src.agents.base import SEVERITY_RANK
 from src.models import (
+    ActionType,
     EvidenceSource,
     FindingCategory,
     FindingEvidence,
@@ -75,11 +76,14 @@ class OperationsSynthesizer:
             ProposedAction(
                 action_id=f"action:{finding.source_finding_ids[0]}",
                 property_id=finding.property_id,
+                action_type=finding.proposed_action_type,
                 description=finding.recommended_next_action,
                 source_finding_ids=finding.source_finding_ids,
             )
             for finding in prioritized
-            if finding.action_proposed and finding.recommended_next_action is not None
+            if finding.action_proposed
+            and finding.proposed_action_type is not None
+            and finding.recommended_next_action is not None
         ]
         affected_properties = sorted(
             {
@@ -170,6 +174,11 @@ class OperationsSynthesizer:
             ),
             None,
         )
+        requires_attention = any(
+            finding.requires_attention for finding in contributors
+        )
+        if not requires_attention:
+            recommended_action = None
         evidence: list[FindingEvidence] = []
         seen_evidence: set[tuple[str, tuple[str, ...], str]] = set()
         for finding in contributors:
@@ -191,10 +200,28 @@ class OperationsSynthesizer:
             source_finding_ids=[finding.finding_id for finding in contributors],
             evidence=evidence,
             recommended_next_action=recommended_action,
-            requires_attention=any(finding.requires_attention for finding in contributors),
+            proposed_action_type=(
+                self._action_type_for(contributors)
+                if recommended_action is not None
+                else None
+            ),
+            requires_attention=requires_attention,
             action_proposed=recommended_action is not None,
             confidence=min(finding.confidence for finding in contributors),
         )
+
+    @staticmethod
+    def _action_type_for(contributors: list[SpecialistFinding]) -> ActionType:
+        message_categories = {
+            FindingCategory.UNANSWERED_MESSAGE,
+            FindingCategory.EARLY_CHECK_IN_REQUEST,
+            FindingCategory.GUEST_COMPLAINT,
+            FindingCategory.GUEST_MAINTENANCE_REPORT,
+            FindingCategory.CLEANER_CONFIRMATION_MISSING,
+        }
+        if any(finding.category in message_categories for finding in contributors):
+            return ActionType.DRAFT_MESSAGE
+        return ActionType.REVIEW
 
     @staticmethod
     def _evidence_ids(

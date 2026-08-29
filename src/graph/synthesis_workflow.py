@@ -89,7 +89,7 @@ def operations_synthesizer_node(
     }
 
 
-def build_phase_5_graph(
+def _create_phase_5_graph_builder(
     *,
     router: RequestRouter | None = None,
     reference_date: date | None = None,
@@ -97,8 +97,8 @@ def build_phase_5_graph(
     failure_simulator: FailureSimulator | None = None,
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
-):
-    """Compile Phase 4 fan-out plus a deferred, evidence-only synthesis node."""
+) -> StateGraph:
+    """Build Phase 4 fan-out plus deferred synthesis, without a terminal edge."""
 
     configured_router = router or RequestRouter()
     configured_synthesizer = synthesis_runner or OperationsSynthesizer()
@@ -170,5 +170,27 @@ def build_phase_5_graph(
     )
     for node_name in SPECIALIST_NODE_NAMES.values():
         graph_builder.add_edge(node_name, "operations_synthesizer")
+    return graph_builder
+
+
+def build_phase_5_graph(
+    *,
+    router: RequestRouter | None = None,
+    reference_date: date | None = None,
+    data_dir: str | Path = DEFAULT_DATA_DIR,
+    failure_simulator: FailureSimulator | None = None,
+    specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
+    synthesis_runner: SynthesisRunner | None = None,
+):
+    """Compile Phase 5 and stop immediately after operations synthesis."""
+
+    graph_builder = _create_phase_5_graph_builder(
+        router=router,
+        reference_date=reference_date,
+        data_dir=data_dir,
+        failure_simulator=failure_simulator,
+        specialist_runners=specialist_runners,
+        synthesis_runner=synthesis_runner,
+    )
     graph_builder.add_edge("operations_synthesizer", END)
     return graph_builder.compile(name="stayops_phase_5_operations_synthesis")

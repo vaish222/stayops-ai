@@ -33,7 +33,15 @@ from src.models.operations import (
     ReservationStatus,
     StayOpsDataset,
 )
+from src.models.risk import (
+    HumanReviewReason,
+    ReviewReasonCode,
+    RiskGateConfig,
+    RiskGateInput,
+    RiskGateOutput,
+)
 from src.models.synthesis import (
+    ActionType,
     OperationsSynthesisInput,
     OperationsSynthesisOutput,
     OverallStatus,
@@ -42,6 +50,7 @@ from src.models.synthesis import (
 )
 
 __all__ = [
+    "ActionType",
     "AgentSourceError",
     "AgentWarning",
     "BookingAgentInput",
@@ -58,6 +67,7 @@ __all__ = [
     "MaintenanceStatus",
     "MaintenanceTicket",
     "MaintenanceAgentInput",
+    "HumanReviewReason",
     "MessageCategory",
     "MessageDirection",
     "MessageUrgency",
@@ -70,6 +80,10 @@ __all__ = [
     "ProposedAction",
     "Reservation",
     "ReservationStatus",
+    "ReviewReasonCode",
+    "RiskGateConfig",
+    "RiskGateInput",
+    "RiskGateOutput",
     "StayOpsDataset",
     "SpecialistFinding",
     "SpecialistInput",

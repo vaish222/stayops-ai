@@ -86,6 +86,22 @@ because both cite the same reservations. Same-property findings with unrelated
 evidence remain separate. Risk gating, approval, and action execution are not
 implemented in Phase 5.
 
+## Phase 6: deterministic risk and action gate
+
+After synthesis, a pure-Python gate evaluates only structured findings, typed
+action proposals, and the router's write-intent flag. It sets
+`requires_human_review` and records explicit, evidence-linked reasons for:
+
+- message sends, reservation modifications, and record updates;
+- high- or critical-severity maintenance findings;
+- confidence below the configurable `0.75` default threshold;
+- contradictory turnover findings about the same property and source record;
+- any request the router classifies as potentially write-producing.
+
+Drafts and read-only review proposals remain safe unless another rule applies.
+If gate evaluation fails, the workflow defaults to requiring review. Phase 6
+stops after this decision: it does not pause for a person or execute any action.
+
 Install and validate with:
 
 ```bash
