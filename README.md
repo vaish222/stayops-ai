@@ -179,7 +179,7 @@ simulated execution record.
 A sidebar toggle reveals the four specialists' structured findings, run logs,
 and workflow errors for debugging. Approval capability values are intentionally
 excluded from this view. The dashboard uses the fixed synthetic operating date
-`2026-08-28` and does not implement Phase 10 evaluation behavior.
+`2026-08-28`.
 
 Run the dashboard locally with:
 
@@ -193,3 +193,30 @@ Install and validate with:
 uv sync --all-groups
 uv run pytest
 ```
+
+## Phase 10: failure recovery and evaluation
+
+The final phase adds a deterministic evaluation harness over the same Phase 8
+LangGraph backend. The validated scenario dataset covers routine operations,
+same-day turnover, missing cleaner confirmation, a guest maintenance complaint,
+conflicting specialist findings, transient and persistent read-tool failures,
+an attempted write without approval, and a successful explicitly approved
+write.
+
+Each scenario records routing, specialist activation, status/risk behavior,
+approval enforcement, safe failure recovery, end-to-end latency, and any
+critical operational claims whose cited records are absent from loaded context.
+Metrics are aggregated against the product requirements without lowering their
+thresholds. The five-minute target is reported as automated workflow latency;
+it is a proxy and not a human usability study.
+
+Run the suite and refresh the saved JSON reports with:
+
+```bash
+uv run python -m src.evaluation.runner
+```
+
+Outputs are saved as `evaluation/results/scenario_results.json`, one diagnostic
+file per scenario under `evaluation/results/scenarios/`, and
+`evaluation/results/aggregate_report.json`. The command exits non-zero if an
+aggregate target is missed.

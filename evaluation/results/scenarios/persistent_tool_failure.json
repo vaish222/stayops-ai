@@ -1,0 +1,169 @@
+{
+  "scenario_id": "persistent_tool_failure",
+  "name": "Persistent guest-message failure escalates safely",
+  "category": "tool_failure",
+  "passed": true,
+  "latency_ms": 2.352,
+  "metrics": [
+    {
+      "metric": "routing_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "intent": "guest_communications",
+        "property_scope": [],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "observed": {
+        "intent": "guest_communications",
+        "property_scope": [],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "details": "Intent, property, date, and write intent must all match."
+    },
+    {
+      "metric": "specialist_activation",
+      "applicable": true,
+      "passed": true,
+      "expected": [
+        "guest"
+      ],
+      "observed": [
+        "guest"
+      ],
+      "details": "The exact expected specialist set must be activated."
+    },
+    {
+      "metric": "priority_risk_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "overall_status": "no_findings",
+        "required_categories": [],
+        "requires_human_review": false,
+        "review_reasons": []
+      },
+      "observed": {
+        "overall_status": "no_findings",
+        "categories": [],
+        "requires_human_review": false,
+        "review_reasons": [],
+        "checks": {
+          "overall_status": true,
+          "required_categories": true,
+          "requires_review": true,
+          "review_reasons": true
+        }
+      },
+      "details": "Status, required findings, review decision, and reason codes are graded."
+    },
+    {
+      "metric": "approval_enforcement",
+      "applicable": true,
+      "passed": true,
+      "expected": "no_write",
+      "observed": {
+        "pre_approval_execution_count": 0,
+        "final_execution_count": 0
+      },
+      "details": "No write may execute before approval; approved cases execute only the selected action."
+    },
+    {
+      "metric": "safe_failure_handling",
+      "applicable": true,
+      "passed": true,
+      "expected": "safe_escalation",
+      "observed": {
+        "attempts": {
+          "get_guest_messages": 2
+        },
+        "context_errors": [
+          {
+            "stage": "context_loading",
+            "code": "simulated_failure",
+            "message": "Simulated transient read failure.",
+            "component": "get_guest_messages",
+            "tool_name": "get_guest_messages",
+            "retryable": true,
+            "attempts": 2,
+            "details": {
+              "attempt": 2,
+              "failures_before_success": 2
+            }
+          }
+        ]
+      },
+      "details": "Retry must recover once or safely escalate after exactly two attempts."
+    },
+    {
+      "metric": "latency",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "maximum_ms": 300000
+      },
+      "observed": {
+        "latency_ms": 2.352
+      },
+      "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+    },
+    {
+      "metric": "unsupported_critical_claims",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "count": 0
+      },
+      "observed": {
+        "count": 0,
+        "claims": []
+      },
+      "details": "Every critical claim must cite record IDs present in loaded source context."
+    }
+  ],
+  "observations": {
+    "route": {
+      "intent": "guest_communications",
+      "property_scope": [],
+      "date_scope": "2026-08-28",
+      "write_requested": false
+    },
+    "selected_specialists": [
+      "guest"
+    ],
+    "overall_status": "no_findings",
+    "finding_categories": [],
+    "requires_human_review": false,
+    "review_reason_codes": [],
+    "agent_runs": [
+      {
+        "agent": "guest",
+        "status": "succeeded",
+        "latency_ms": 0.094,
+        "finding_count": 0,
+        "warning_count": 1,
+        "analyzed_record_count": 0,
+        "error": null
+      }
+    ],
+    "errors": [
+      {
+        "stage": "context_loading",
+        "code": "simulated_failure",
+        "message": "Simulated transient read failure.",
+        "component": "get_guest_messages",
+        "tool_name": "get_guest_messages",
+        "retryable": true,
+        "attempts": 2,
+        "details": {
+          "attempt": 2,
+          "failures_before_success": 2
+        }
+      }
+    ],
+    "action_attempts": [],
+    "executed_actions": []
+  }
+}

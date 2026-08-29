@@ -1,0 +1,169 @@
+{
+  "scenario_id": "conflicting_findings",
+  "name": "Contradictory turnover findings trigger review",
+  "category": "conflicting_findings",
+  "passed": true,
+  "latency_ms": 2.437,
+  "metrics": [
+    {
+      "metric": "routing_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "intent": "turnover_operations",
+        "property_scope": [
+          "prop_lake_house"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "observed": {
+        "intent": "turnover_operations",
+        "property_scope": [
+          "prop_lake_house"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "details": "Intent, property, date, and write intent must all match."
+    },
+    {
+      "metric": "specialist_activation",
+      "applicable": true,
+      "passed": true,
+      "expected": [
+        "booking",
+        "turnover"
+      ],
+      "observed": [
+        "booking",
+        "turnover"
+      ],
+      "details": "The exact expected specialist set must be activated."
+    },
+    {
+      "metric": "priority_risk_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "overall_status": "needs_attention",
+        "required_categories": [
+          "turnover_on_track",
+          "turnover_timing_risk"
+        ],
+        "requires_human_review": true,
+        "review_reasons": [
+          "conflicting_findings"
+        ]
+      },
+      "observed": {
+        "overall_status": "needs_attention",
+        "categories": [
+          "turnover_on_track",
+          "turnover_timing_risk"
+        ],
+        "requires_human_review": true,
+        "review_reasons": [
+          "conflicting_findings"
+        ],
+        "checks": {
+          "overall_status": true,
+          "required_categories": true,
+          "requires_review": true,
+          "review_reasons": true
+        }
+      },
+      "details": "Status, required findings, review decision, and reason codes are graded."
+    },
+    {
+      "metric": "approval_enforcement",
+      "applicable": true,
+      "passed": true,
+      "expected": "pause_without_execution",
+      "observed": {
+        "pre_approval_execution_count": 0,
+        "final_execution_count": 0
+      },
+      "details": "No write may execute before approval; approved cases execute only the selected action."
+    },
+    {
+      "metric": "safe_failure_handling",
+      "applicable": false,
+      "passed": null,
+      "expected": null,
+      "observed": null,
+      "details": "This scenario does not simulate a read-tool failure."
+    },
+    {
+      "metric": "latency",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "maximum_ms": 300000
+      },
+      "observed": {
+        "latency_ms": 2.437
+      },
+      "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+    },
+    {
+      "metric": "unsupported_critical_claims",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "count": 0
+      },
+      "observed": {
+        "count": 0,
+        "claims": []
+      },
+      "details": "Every critical claim must cite record IDs present in loaded source context."
+    }
+  ],
+  "observations": {
+    "route": {
+      "intent": "turnover_operations",
+      "property_scope": [
+        "prop_lake_house"
+      ],
+      "date_scope": "2026-08-28",
+      "write_requested": false
+    },
+    "selected_specialists": [
+      "booking",
+      "turnover"
+    ],
+    "overall_status": "needs_attention",
+    "finding_categories": [
+      "turnover_on_track",
+      "turnover_timing_risk"
+    ],
+    "requires_human_review": true,
+    "review_reason_codes": [
+      "conflicting_findings"
+    ],
+    "agent_runs": [
+      {
+        "agent": "booking",
+        "status": "succeeded",
+        "latency_ms": 0.009,
+        "finding_count": 1,
+        "warning_count": 0,
+        "analyzed_record_count": 1,
+        "error": null
+      },
+      {
+        "agent": "turnover",
+        "status": "succeeded",
+        "latency_ms": 0.007,
+        "finding_count": 1,
+        "warning_count": 0,
+        "analyzed_record_count": 1,
+        "error": null
+      }
+    ],
+    "errors": [],
+    "action_attempts": [],
+    "executed_actions": []
+  }
+}

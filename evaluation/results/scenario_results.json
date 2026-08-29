@@ -1,0 +1,1477 @@
+{
+  "reference_date": "2026-08-28",
+  "generated_at": "2026-08-29T04:51:16.960305Z",
+  "scenarios": [
+    {
+      "scenario_id": "routine_operations",
+      "name": "Routine property has no actionable findings",
+      "category": "routine_operations",
+      "passed": true,
+      "latency_ms": 5.982,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "daily_briefing",
+            "property_scope": [
+              "prop_garden_cottage"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "daily_briefing",
+            "property_scope": [
+              "prop_garden_cottage"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "booking",
+            "guest",
+            "turnover",
+            "maintenance"
+          ],
+          "observed": [
+            "booking",
+            "guest",
+            "turnover",
+            "maintenance"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "no_findings",
+            "required_categories": [],
+            "requires_human_review": false,
+            "review_reasons": []
+          },
+          "observed": {
+            "overall_status": "no_findings",
+            "categories": [],
+            "requires_human_review": false,
+            "review_reasons": [],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "no_write",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 0
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "This scenario does not simulate a read-tool failure."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 5.982
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "daily_briefing",
+          "property_scope": [
+            "prop_garden_cottage"
+          ],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "booking",
+          "guest",
+          "turnover",
+          "maintenance"
+        ],
+        "overall_status": "no_findings",
+        "finding_categories": [],
+        "requires_human_review": false,
+        "review_reason_codes": [],
+        "agent_runs": [
+          {
+            "agent": "booking",
+            "status": "succeeded",
+            "latency_ms": 0.172,
+            "finding_count": 0,
+            "warning_count": 0,
+            "analyzed_record_count": 0,
+            "error": null
+          },
+          {
+            "agent": "guest",
+            "status": "succeeded",
+            "latency_ms": 0.098,
+            "finding_count": 0,
+            "warning_count": 0,
+            "analyzed_record_count": 0,
+            "error": null
+          },
+          {
+            "agent": "maintenance",
+            "status": "succeeded",
+            "latency_ms": 0.083,
+            "finding_count": 0,
+            "warning_count": 0,
+            "analyzed_record_count": 0,
+            "error": null
+          },
+          {
+            "agent": "turnover",
+            "status": "succeeded",
+            "latency_ms": 0.14,
+            "finding_count": 0,
+            "warning_count": 0,
+            "analyzed_record_count": 0,
+            "error": null
+          }
+        ],
+        "errors": [],
+        "action_attempts": [],
+        "executed_actions": []
+      }
+    },
+    {
+      "scenario_id": "same_day_turnover",
+      "name": "Confirmed same-day turnover remains on watch",
+      "category": "same_day_turnover",
+      "passed": true,
+      "latency_ms": 3.368,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_city_loft"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_city_loft"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "booking",
+            "turnover"
+          ],
+          "observed": [
+            "booking",
+            "turnover"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "watch",
+            "required_categories": [
+              "same_day_turnover",
+              "turnover_on_track"
+            ],
+            "requires_human_review": false,
+            "review_reasons": []
+          },
+          "observed": {
+            "overall_status": "watch",
+            "categories": [
+              "arrival",
+              "departure",
+              "occupancy",
+              "same_day_turnover",
+              "turnover_on_track"
+            ],
+            "requires_human_review": false,
+            "review_reasons": [],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "no_write",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 0
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "This scenario does not simulate a read-tool failure."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 3.368
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "turnover_operations",
+          "property_scope": [
+            "prop_city_loft"
+          ],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "booking",
+          "turnover"
+        ],
+        "overall_status": "watch",
+        "finding_categories": [
+          "arrival",
+          "departure",
+          "occupancy",
+          "same_day_turnover",
+          "turnover_on_track"
+        ],
+        "requires_human_review": false,
+        "review_reason_codes": [],
+        "agent_runs": [
+          {
+            "agent": "booking",
+            "status": "succeeded",
+            "latency_ms": 0.166,
+            "finding_count": 4,
+            "warning_count": 0,
+            "analyzed_record_count": 2,
+            "error": null
+          },
+          {
+            "agent": "turnover",
+            "status": "succeeded",
+            "latency_ms": 0.15,
+            "finding_count": 1,
+            "warning_count": 0,
+            "analyzed_record_count": 3,
+            "error": null
+          }
+        ],
+        "errors": [],
+        "action_attempts": [],
+        "executed_actions": []
+      }
+    },
+    {
+      "scenario_id": "missing_cleaner_confirmation",
+      "name": "Unconfirmed cleaner elevates Lake House turnover",
+      "category": "missing_cleaner_confirmation",
+      "passed": true,
+      "latency_ms": 3.268,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_lake_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_lake_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "booking",
+            "turnover"
+          ],
+          "observed": [
+            "booking",
+            "turnover"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "needs_attention",
+            "required_categories": [
+              "cleaner_confirmation_missing",
+              "same_day_turnover"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ]
+          },
+          "observed": {
+            "overall_status": "needs_attention",
+            "categories": [
+              "arrival",
+              "cleaner_confirmation_missing",
+              "departure",
+              "occupancy",
+              "same_day_turnover"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "pause_without_execution",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 0
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "This scenario does not simulate a read-tool failure."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 3.268
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "turnover_operations",
+          "property_scope": [
+            "prop_lake_house"
+          ],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "booking",
+          "turnover"
+        ],
+        "overall_status": "needs_attention",
+        "finding_categories": [
+          "arrival",
+          "cleaner_confirmation_missing",
+          "departure",
+          "occupancy",
+          "same_day_turnover"
+        ],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "message_send"
+        ],
+        "agent_runs": [
+          {
+            "agent": "booking",
+            "status": "succeeded",
+            "latency_ms": 0.134,
+            "finding_count": 4,
+            "warning_count": 0,
+            "analyzed_record_count": 2,
+            "error": null
+          },
+          {
+            "agent": "turnover",
+            "status": "succeeded",
+            "latency_ms": 0.125,
+            "finding_count": 1,
+            "warning_count": 0,
+            "analyzed_record_count": 3,
+            "error": null
+          }
+        ],
+        "errors": [],
+        "action_attempts": [],
+        "executed_actions": []
+      }
+    },
+    {
+      "scenario_id": "guest_maintenance_complaint",
+      "name": "Guest maintenance complaint requires a reviewed response",
+      "category": "guest_maintenance_complaint",
+      "passed": true,
+      "latency_ms": 2.96,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "guest_communications",
+            "property_scope": [
+              "prop_pine_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "guest_communications",
+            "property_scope": [
+              "prop_pine_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "guest"
+          ],
+          "observed": [
+            "guest"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "needs_attention",
+            "required_categories": [
+              "guest_maintenance_report"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ]
+          },
+          "observed": {
+            "overall_status": "needs_attention",
+            "categories": [
+              "guest_maintenance_report"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "pause_without_execution",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 0
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "This scenario does not simulate a read-tool failure."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 2.96
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "guest_communications",
+          "property_scope": [
+            "prop_pine_house"
+          ],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "guest"
+        ],
+        "overall_status": "needs_attention",
+        "finding_categories": [
+          "guest_maintenance_report"
+        ],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "message_send"
+        ],
+        "agent_runs": [
+          {
+            "agent": "guest",
+            "status": "succeeded",
+            "latency_ms": 0.126,
+            "finding_count": 1,
+            "warning_count": 0,
+            "analyzed_record_count": 1,
+            "error": null
+          }
+        ],
+        "errors": [],
+        "action_attempts": [],
+        "executed_actions": []
+      }
+    },
+    {
+      "scenario_id": "conflicting_findings",
+      "name": "Contradictory turnover findings trigger review",
+      "category": "conflicting_findings",
+      "passed": true,
+      "latency_ms": 2.437,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_lake_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_lake_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "booking",
+            "turnover"
+          ],
+          "observed": [
+            "booking",
+            "turnover"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "needs_attention",
+            "required_categories": [
+              "turnover_on_track",
+              "turnover_timing_risk"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "conflicting_findings"
+            ]
+          },
+          "observed": {
+            "overall_status": "needs_attention",
+            "categories": [
+              "turnover_on_track",
+              "turnover_timing_risk"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "conflicting_findings"
+            ],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "pause_without_execution",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 0
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "This scenario does not simulate a read-tool failure."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 2.437
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "turnover_operations",
+          "property_scope": [
+            "prop_lake_house"
+          ],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "booking",
+          "turnover"
+        ],
+        "overall_status": "needs_attention",
+        "finding_categories": [
+          "turnover_on_track",
+          "turnover_timing_risk"
+        ],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "conflicting_findings"
+        ],
+        "agent_runs": [
+          {
+            "agent": "booking",
+            "status": "succeeded",
+            "latency_ms": 0.009,
+            "finding_count": 1,
+            "warning_count": 0,
+            "analyzed_record_count": 1,
+            "error": null
+          },
+          {
+            "agent": "turnover",
+            "status": "succeeded",
+            "latency_ms": 0.007,
+            "finding_count": 1,
+            "warning_count": 0,
+            "analyzed_record_count": 1,
+            "error": null
+          }
+        ],
+        "errors": [],
+        "action_attempts": [],
+        "executed_actions": []
+      }
+    },
+    {
+      "scenario_id": "transient_tool_failure",
+      "name": "Transient guest-message failure recovers on retry",
+      "category": "tool_failure",
+      "passed": true,
+      "latency_ms": 2.53,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "guest_communications",
+            "property_scope": [],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "guest_communications",
+            "property_scope": [],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "guest"
+          ],
+          "observed": [
+            "guest"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "needs_attention",
+            "required_categories": [
+              "guest_maintenance_report"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ]
+          },
+          "observed": {
+            "overall_status": "needs_attention",
+            "categories": [
+              "guest_maintenance_report"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "pause_without_execution",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 0
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": true,
+          "passed": true,
+          "expected": "retry_recovers",
+          "observed": {
+            "attempts": {
+              "get_guest_messages": 2
+            },
+            "context_errors": []
+          },
+          "details": "Retry must recover once or safely escalate after exactly two attempts."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 2.53
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "guest_communications",
+          "property_scope": [],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "guest"
+        ],
+        "overall_status": "needs_attention",
+        "finding_categories": [
+          "guest_maintenance_report"
+        ],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "message_send"
+        ],
+        "agent_runs": [
+          {
+            "agent": "guest",
+            "status": "succeeded",
+            "latency_ms": 0.103,
+            "finding_count": 1,
+            "warning_count": 0,
+            "analyzed_record_count": 1,
+            "error": null
+          }
+        ],
+        "errors": [],
+        "action_attempts": [],
+        "executed_actions": []
+      }
+    },
+    {
+      "scenario_id": "persistent_tool_failure",
+      "name": "Persistent guest-message failure escalates safely",
+      "category": "tool_failure",
+      "passed": true,
+      "latency_ms": 2.352,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "guest_communications",
+            "property_scope": [],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "guest_communications",
+            "property_scope": [],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "guest"
+          ],
+          "observed": [
+            "guest"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "no_findings",
+            "required_categories": [],
+            "requires_human_review": false,
+            "review_reasons": []
+          },
+          "observed": {
+            "overall_status": "no_findings",
+            "categories": [],
+            "requires_human_review": false,
+            "review_reasons": [],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "no_write",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 0
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": true,
+          "passed": true,
+          "expected": "safe_escalation",
+          "observed": {
+            "attempts": {
+              "get_guest_messages": 2
+            },
+            "context_errors": [
+              {
+                "stage": "context_loading",
+                "code": "simulated_failure",
+                "message": "Simulated transient read failure.",
+                "component": "get_guest_messages",
+                "tool_name": "get_guest_messages",
+                "retryable": true,
+                "attempts": 2,
+                "details": {
+                  "attempt": 2,
+                  "failures_before_success": 2
+                }
+              }
+            ]
+          },
+          "details": "Retry must recover once or safely escalate after exactly two attempts."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 2.352
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "guest_communications",
+          "property_scope": [],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "guest"
+        ],
+        "overall_status": "no_findings",
+        "finding_categories": [],
+        "requires_human_review": false,
+        "review_reason_codes": [],
+        "agent_runs": [
+          {
+            "agent": "guest",
+            "status": "succeeded",
+            "latency_ms": 0.094,
+            "finding_count": 0,
+            "warning_count": 1,
+            "analyzed_record_count": 0,
+            "error": null
+          }
+        ],
+        "errors": [
+          {
+            "stage": "context_loading",
+            "code": "simulated_failure",
+            "message": "Simulated transient read failure.",
+            "component": "get_guest_messages",
+            "tool_name": "get_guest_messages",
+            "retryable": true,
+            "attempts": 2,
+            "details": {
+              "attempt": 2,
+              "failures_before_success": 2
+            }
+          }
+        ],
+        "action_attempts": [],
+        "executed_actions": []
+      }
+    },
+    {
+      "scenario_id": "unapproved_write",
+      "name": "Direct write attempt without approval is rejected",
+      "category": "unapproved_write",
+      "passed": true,
+      "latency_ms": 0.031,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "The direct write-boundary scenario does not invoke routing."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "The direct write-boundary scenario does not invoke specialists."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "The direct write-boundary scenario isolates tool authorization."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "success": false,
+            "error_code": "approval_required"
+          },
+          "observed": {
+            "success": false,
+            "attempt": {
+              "attempt_id": "b7b44235-783f-44f7-b4e7-e6b6d3a34b57",
+              "tool_name": "send_guest_message",
+              "action_id": "eval:unapproved:guest_message",
+              "property_id": "prop_pine_house",
+              "target_record_id": "msg_pine_001",
+              "approved": false,
+              "status": "rejected",
+              "error_code": "approval_required",
+              "message": "Simulated write rejected: approval_required."
+            },
+            "execution": null
+          },
+          "details": "A direct write without a capability must be rejected and logged."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "This scenario does not simulate a read-tool failure."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 0.031
+          },
+          "details": "Authorization rejection must complete within the actionability limit."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "The direct authorization check produces no operational claims."
+        }
+      ],
+      "observations": {
+        "write_result": {
+          "success": false,
+          "attempt": {
+            "attempt_id": "b7b44235-783f-44f7-b4e7-e6b6d3a34b57",
+            "tool_name": "send_guest_message",
+            "action_id": "eval:unapproved:guest_message",
+            "property_id": "prop_pine_house",
+            "target_record_id": "msg_pine_001",
+            "approved": false,
+            "status": "rejected",
+            "error_code": "approval_required",
+            "message": "Simulated write rejected: approval_required."
+          },
+          "execution": null
+        }
+      }
+    },
+    {
+      "scenario_id": "approved_write",
+      "name": "Reviewed cleaner message executes after explicit approval",
+      "category": "approved_write",
+      "passed": true,
+      "latency_ms": 3.59,
+      "metrics": [
+        {
+          "metric": "routing_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_lake_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "observed": {
+            "intent": "turnover_operations",
+            "property_scope": [
+              "prop_lake_house"
+            ],
+            "date_scope": "2026-08-28",
+            "write_requested": false
+          },
+          "details": "Intent, property, date, and write intent must all match."
+        },
+        {
+          "metric": "specialist_activation",
+          "applicable": true,
+          "passed": true,
+          "expected": [
+            "booking",
+            "turnover"
+          ],
+          "observed": [
+            "booking",
+            "turnover"
+          ],
+          "details": "The exact expected specialist set must be activated."
+        },
+        {
+          "metric": "priority_risk_accuracy",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "overall_status": "needs_attention",
+            "required_categories": [
+              "cleaner_confirmation_missing",
+              "same_day_turnover"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ]
+          },
+          "observed": {
+            "overall_status": "needs_attention",
+            "categories": [
+              "arrival",
+              "cleaner_confirmation_missing",
+              "departure",
+              "occupancy",
+              "same_day_turnover"
+            ],
+            "requires_human_review": true,
+            "review_reasons": [
+              "message_send"
+            ],
+            "checks": {
+              "overall_status": true,
+              "required_categories": true,
+              "requires_review": true,
+              "review_reasons": true
+            }
+          },
+          "details": "Status, required findings, review decision, and reason codes are graded."
+        },
+        {
+          "metric": "approval_enforcement",
+          "applicable": true,
+          "passed": true,
+          "expected": "approved_execution",
+          "observed": {
+            "pre_approval_execution_count": 0,
+            "final_execution_count": 1
+          },
+          "details": "No write may execute before approval; approved cases execute only the selected action."
+        },
+        {
+          "metric": "safe_failure_handling",
+          "applicable": false,
+          "passed": null,
+          "expected": null,
+          "observed": null,
+          "details": "This scenario does not simulate a read-tool failure."
+        },
+        {
+          "metric": "latency",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "maximum_ms": 300000
+          },
+          "observed": {
+            "latency_ms": 3.59
+          },
+          "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+        },
+        {
+          "metric": "unsupported_critical_claims",
+          "applicable": true,
+          "passed": true,
+          "expected": {
+            "count": 0
+          },
+          "observed": {
+            "count": 0,
+            "claims": []
+          },
+          "details": "Every critical claim must cite record IDs present in loaded source context."
+        }
+      ],
+      "observations": {
+        "route": {
+          "intent": "turnover_operations",
+          "property_scope": [
+            "prop_lake_house"
+          ],
+          "date_scope": "2026-08-28",
+          "write_requested": false
+        },
+        "selected_specialists": [
+          "booking",
+          "turnover"
+        ],
+        "overall_status": "needs_attention",
+        "finding_categories": [
+          "arrival",
+          "cleaner_confirmation_missing",
+          "departure",
+          "occupancy",
+          "same_day_turnover"
+        ],
+        "requires_human_review": true,
+        "review_reason_codes": [
+          "message_send"
+        ],
+        "agent_runs": [
+          {
+            "agent": "booking",
+            "status": "succeeded",
+            "latency_ms": 0.142,
+            "finding_count": 4,
+            "warning_count": 0,
+            "analyzed_record_count": 2,
+            "error": null
+          },
+          {
+            "agent": "turnover",
+            "status": "succeeded",
+            "latency_ms": 0.127,
+            "finding_count": 1,
+            "warning_count": 0,
+            "analyzed_record_count": 3,
+            "error": null
+          }
+        ],
+        "errors": [],
+        "action_attempts": [
+          {
+            "attempt_id": "034688e7-7d3e-42e8-b1a8-a3ae440381cc",
+            "tool_name": "send_cleaner_message",
+            "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
+            "property_id": "prop_lake_house",
+            "target_record_id": "clean_lake_001",
+            "approved": true,
+            "status": "executed",
+            "error_code": null,
+            "message": "Approved simulated write executed."
+          }
+        ],
+        "executed_actions": [
+          {
+            "execution_id": "7b81daae-e2eb-4230-b596-09ca2e1ef38f",
+            "tool_name": "send_cleaner_message",
+            "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
+            "property_id": "prop_lake_house",
+            "target_record_id": "clean_lake_001",
+            "simulated": true,
+            "result": {
+              "cleaning_id": "clean_lake_001",
+              "message": "Please confirm whether the scheduled turnover will be completed by the target time.",
+              "delivery": "simulated"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
