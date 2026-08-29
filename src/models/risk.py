@@ -12,6 +12,7 @@ from src.models.synthesis import PrioritizedFinding, ProposedAction
 
 class ReviewReasonCode(StrEnum):
     SOURCE_DATA_UNAVAILABLE = "source_data_unavailable"
+    SYNTHESIS_UNAVAILABLE = "synthesis_unavailable"
     WRITE_REQUESTED = "write_requested"
     MESSAGE_SEND = "message_send"
     RESERVATION_MODIFICATION = "reservation_modification"
@@ -32,6 +33,7 @@ class RiskGateConfig(StrictModel):
 
 class RiskGateInput(StrictModel):
     write_requested: bool = False
+    synthesis_complete: bool = True
     unavailable_sources: list[str] = Field(default_factory=list)
     specialist_findings: list[SpecialistFinding]
     prioritized_findings: list[PrioritizedFinding]

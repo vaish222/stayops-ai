@@ -3,7 +3,7 @@
   "name": "Confirmed same-day turnover remains on watch",
   "category": "same_day_turnover",
   "passed": true,
-  "latency_ms": 3.571,
+  "latency_ms": 4.59,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -101,7 +101,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 3.571
+        "latency_ms": 4.59
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -135,8 +135,19 @@
     "overall_status": "watch",
     "analysis_complete": true,
     "unavailable_sources": [],
-    "final_response": "Overall status: watch. 1 prioritized item across 1 affected property.\n\nNo human approval was required and no simulated action was executed.",
+    "final_response": "1 property has a cleaning or turnover risk on Aug 28.\n\n- **City Loft** — Checkout 10:00 AM; cleaning target 1:30 PM; next check-in 3:00 PM; Confirmed. **Next:** Verify turnover readiness between the two stays. Waiting for approval: Verify turnover readiness between the two stays.",
     "response_generated": true,
+    "synthesis_run": {
+      "mode": "deterministic",
+      "provider": null,
+      "model": null,
+      "status": "completed",
+      "latency_ms": 0.165,
+      "prioritized_finding_count": 5,
+      "fallback_used": false,
+      "error_code": null,
+      "error_type": null
+    },
     "finding_categories": [
       "arrival",
       "departure",
@@ -150,7 +161,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.162,
+        "latency_ms": 0.242,
         "finding_count": 4,
         "warning_count": 0,
         "analyzed_record_count": 2,
@@ -159,7 +170,7 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.148,
+        "latency_ms": 0.161,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 4,

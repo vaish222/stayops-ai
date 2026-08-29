@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from datetime import UTC, date, datetime
 from pathlib import Path
 from statistics import median
@@ -25,6 +26,7 @@ from src.evaluation.contracts import (
     WriteExpectation,
 )
 from src.graph import build_phase_8_graph, create_initial_state
+from src.graph.synthesis_workflow import SynthesisRunner
 from src.models import (
     ActionType,
     EvidenceSource,
@@ -422,6 +424,7 @@ def _failure_observation(
 def _run_workflow_scenario(
     scenario: EvaluationScenario,
     reference_date: date,
+    synthesis_runner: SynthesisRunner | None = None,
 ) -> ScenarioResult:
     simulator = None
     if scenario.failure_plan:
@@ -433,6 +436,7 @@ def _run_workflow_scenario(
         reference_date=reference_date,
         failure_simulator=simulator,
         specialist_runners=specialist_runners,
+        synthesis_runner=synthesis_runner,
     )
     config = {"configurable": {"thread_id": f"eval-{scenario.scenario_id}"}}
     started = perf_counter_ns()
@@ -516,6 +520,7 @@ def _run_workflow_scenario(
         "unavailable_sources": state["unavailable_sources"],
         "final_response": state["final_response"],
         "response_generated": state["response_generated"],
+        "synthesis_run": state.get("synthesis_run"),
         "finding_categories": sorted(
             {
                 category
@@ -703,6 +708,64 @@ def _aggregate(results: ScenarioResults) -> EvaluationReport:
             passed=max_latency < LATENCY_TARGET_MS,
         )
     )
+    synthesis_runs = [
+        run
+        for scenario in results.scenarios
+        if (run := scenario.observations.get("synthesis_run")) is not None
+    ]
+    synthesis_latencies = sorted(
+        float(run.get("latency_ms", 0)) for run in synthesis_runs
+    )
+    p95_index = max(0, math.ceil(0.95 * len(synthesis_latencies)) - 1)
+    modes = sorted({str(run.get("mode")) for run in synthesis_runs})
+    providers = sorted(
+        {str(run.get("provider")) for run in synthesis_runs if run.get("provider")}
+    )
+    models = sorted(
+        {str(run.get("model")) for run in synthesis_runs if run.get("model")}
+    )
+    synthesis_summary = {
+        "modes": modes,
+        "providers": providers,
+        "models": models,
+        "run_count": len(synthesis_runs),
+        "average_latency_ms": (
+            round(sum(synthesis_latencies) / len(synthesis_latencies), 3)
+            if synthesis_latencies
+            else 0.0
+        ),
+        "p95_latency_ms": (
+            synthesis_latencies[p95_index] if synthesis_latencies else 0.0
+        ),
+        "model_or_schema_failure_rate": (
+            round(
+                sum(
+                    run.get("error_code")
+                    in {"llm_provider_failure", "llm_schema_validation_failure"}
+                    for run in synthesis_runs
+                )
+                / len(synthesis_runs),
+                4,
+            )
+            if synthesis_runs
+            else 0.0
+        ),
+        "grounding_failure_rate": (
+            round(
+                sum(
+                    run.get("error_code") == "llm_grounding_failure"
+                    for run in synthesis_runs
+                )
+                / len(synthesis_runs),
+                4,
+            )
+            if synthesis_runs
+            else 0.0
+        ),
+        "fallback_count": sum(
+            bool(run.get("fallback_used")) for run in synthesis_runs
+        ),
+    }
     return EvaluationReport(
         reference_date=results.reference_date,
         generated_at=results.generated_at,
@@ -716,8 +779,10 @@ def _aggregate(results: ScenarioResults) -> EvaluationReport:
             "maximum": max_latency,
             "target": float(LATENCY_TARGET_MS),
         },
+        synthesis_summary=synthesis_summary,
         notes=[
-            "All scenarios use fixed synthetic data and deterministic rules.",
+            "All scenarios use fixed synthetic operational data and deterministic safety rules.",
+            "Run the same scenario set separately for deterministic, Nebius, and Ollama synthesis comparisons.",
             "Latency measures automated end-to-end execution, not a human usability study.",
             "Critical claims are supported only when every cited record exists in loaded context.",
         ],
@@ -729,6 +794,7 @@ def run_evaluations(
     *,
     reference_date: date = REFERENCE_DATE,
     generated_at: datetime | None = None,
+    synthesis_runner: SynthesisRunner | None = None,
 ) -> tuple[ScenarioResults, EvaluationReport]:
     """Execute all controlled scenarios and calculate PRD target metrics."""
 
@@ -736,7 +802,11 @@ def run_evaluations(
     scenario_results = [
         _run_unapproved_write_scenario(scenario)
         if scenario.category == ScenarioCategory.UNAPPROVED_WRITE
-        else _run_workflow_scenario(scenario, reference_date)
+        else _run_workflow_scenario(
+            scenario,
+            reference_date,
+            synthesis_runner=synthesis_runner,
+        )
         for scenario in configured
     ]
     results = ScenarioResults(

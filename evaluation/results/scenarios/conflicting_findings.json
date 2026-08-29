@@ -3,7 +3,7 @@
   "name": "Contradictory turnover findings trigger review",
   "category": "conflicting_findings",
   "passed": true,
-  "latency_ms": 2.948,
+  "latency_ms": 3.136,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -102,7 +102,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 2.948
+        "latency_ms": 3.136
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -138,6 +138,17 @@
     "unavailable_sources": [],
     "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
     "response_generated": false,
+    "synthesis_run": {
+      "mode": "deterministic",
+      "provider": null,
+      "model": null,
+      "status": "completed",
+      "latency_ms": 0.118,
+      "prioritized_finding_count": 2,
+      "fallback_used": false,
+      "error_code": null,
+      "error_type": null
+    },
     "finding_categories": [
       "turnover_on_track",
       "turnover_timing_risk"
@@ -150,7 +161,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.014,
+        "latency_ms": 0.012,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 1,
@@ -159,7 +170,7 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.012,
+        "latency_ms": 0.008,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 1,

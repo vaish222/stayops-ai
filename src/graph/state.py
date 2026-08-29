@@ -50,6 +50,8 @@ class StayOpsState(TypedDict):
     cleaning_context: dict[str, dict[str, Any]]
     maintenance_context: dict[str, dict[str, Any]]
     analysis_complete: bool
+    synthesis_complete: bool
+    synthesis_run: dict[str, Any] | None
     unavailable_sources: list[str]
     booking_findings: list[dict[str, Any]]
     guest_findings: list[dict[str, Any]]
@@ -92,6 +94,8 @@ def create_initial_state(host_query: str, request_id: str | None = None) -> Stay
         cleaning_context={},
         maintenance_context={},
         analysis_complete=True,
+        synthesis_complete=False,
+        synthesis_run=None,
         unavailable_sources=[],
         booking_findings=[],
         guest_findings=[],

@@ -3,7 +3,7 @@
   "name": "Reviewed cleaner message executes after explicit approval",
   "category": "approved_write",
   "passed": true,
-  "latency_ms": 4.65,
+  "latency_ms": 4.775,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -105,7 +105,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 4.65
+        "latency_ms": 4.775
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -139,8 +139,19 @@
     "overall_status": "needs_attention",
     "analysis_complete": true,
     "unavailable_sources": [],
-    "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.\n\nApproved: 1 simulated action executed (send_cleaner_message → clean_lake_001).",
+    "final_response": "1 property has a cleaning or turnover risk on Aug 28.\n\n- **Lake House** — Checkout 11:00 AM; cleaning target 2:00 PM; next check-in 4:00 PM; confirmation pending. **Next:** Please confirm whether the scheduled turnover will be completed by the target time.",
     "response_generated": true,
+    "synthesis_run": {
+      "mode": "deterministic",
+      "provider": null,
+      "model": null,
+      "status": "completed",
+      "latency_ms": 0.122,
+      "prioritized_finding_count": 4,
+      "fallback_used": false,
+      "error_code": null,
+      "error_type": null
+    },
     "finding_categories": [
       "arrival",
       "cleaner_confirmation_missing",
@@ -156,7 +167,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.157,
+        "latency_ms": 0.148,
         "finding_count": 4,
         "warning_count": 0,
         "analyzed_record_count": 2,
@@ -175,7 +186,7 @@
     "errors": [],
     "action_attempts": [
       {
-        "attempt_id": "937e4a6b-92b1-4e79-86e5-7995c25b2218",
+        "attempt_id": "6b5dcfbe-5338-4dd0-8b9a-0dbc6e4cb547",
         "tool_name": "send_cleaner_message",
         "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
         "property_id": "prop_lake_house",
@@ -188,7 +199,7 @@
     ],
     "executed_actions": [
       {
-        "execution_id": "a4ec42f0-ef79-412b-b45b-f087277a7f1b",
+        "execution_id": "ffd1ed37-dff2-4e4c-ad68-669394cbcc00",
         "tool_name": "send_cleaner_message",
         "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
         "property_id": "prop_lake_house",

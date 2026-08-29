@@ -3,7 +3,7 @@
   "name": "Routine property has no actionable findings",
   "category": "routine_operations",
   "passed": true,
-  "latency_ms": 6.289,
+  "latency_ms": 6.604,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -96,7 +96,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 6.289
+        "latency_ms": 6.604
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -132,8 +132,19 @@
     "overall_status": "no_findings",
     "analysis_complete": true,
     "unavailable_sources": [],
-    "final_response": "No structured specialist findings were supplied.\n\nNo human approval was required and no simulated action was executed.",
+    "final_response": "No properties need immediate action on Aug 28.",
     "response_generated": true,
+    "synthesis_run": {
+      "mode": "deterministic",
+      "provider": null,
+      "model": null,
+      "status": "completed",
+      "latency_ms": 0.104,
+      "prioritized_finding_count": 0,
+      "fallback_used": false,
+      "error_code": null,
+      "error_type": null
+    },
     "finding_categories": [],
     "requires_human_review": false,
     "review_reason_codes": [],
@@ -141,7 +152,7 @@
       {
         "agent": "booking",
         "status": "succeeded",
-        "latency_ms": 0.137,
+        "latency_ms": 0.159,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -150,7 +161,7 @@
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.091,
+        "latency_ms": 0.094,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -159,7 +170,7 @@
       {
         "agent": "maintenance",
         "status": "succeeded",
-        "latency_ms": 0.081,
+        "latency_ms": 0.097,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 0,
@@ -168,7 +179,7 @@
       {
         "agent": "turnover",
         "status": "succeeded",
-        "latency_ms": 0.123,
+        "latency_ms": 0.152,
         "finding_count": 0,
         "warning_count": 0,
         "analyzed_record_count": 1,

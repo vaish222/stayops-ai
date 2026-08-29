@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
+from time import perf_counter_ns
 from typing import Any, Protocol
 
 from langgraph.graph import END, START, StateGraph
@@ -13,10 +14,10 @@ from src.agents import (
     BookingAgent,
     GuestAgent,
     MaintenanceAgent,
-    OperationsSynthesizer,
     RequestRouter,
     TurnoverAgent,
 )
+from src.agents.llm_operations_synthesizer import LLMSynthesisUnavailable
 from src.graph.parallel_workflow import (
     SPECIALIST_FINDING_FIELDS,
     SPECIALIST_NODE_NAMES,
@@ -26,13 +27,24 @@ from src.graph.parallel_workflow import (
 )
 from src.graph.routing import request_router_node
 from src.graph.state import StayOpsState, WorkflowError
-from src.models import OperationsSynthesisOutput, SpecialistName
+from src.llm.factory import build_synthesis_runner
+from src.models import (
+    OperationsSynthesisOutput,
+    SpecialistName,
+    SynthesisExecutionResult,
+    SynthesisInvocation,
+    SynthesisRunMetadata,
+    SynthesisRunStatus,
+)
 from src.tools import FailureSimulator, SimulatedOperationsStore
 from src.tools.read_tools import DEFAULT_DATA_DIR
 
 
 class SynthesisRunner(Protocol):
-    def invoke(self, payload: dict[str, Any]) -> OperationsSynthesisOutput: ...
+    def invoke(
+        self,
+        payload: SynthesisInvocation | dict[str, Any],
+    ) -> SynthesisExecutionResult | OperationsSynthesisOutput: ...
 
 
 def _incomplete_analysis_warning(unavailable_sources: list[str]) -> str:
@@ -53,23 +65,65 @@ def operations_synthesizer_node(
 ) -> dict[str, Any]:
     """Synthesize only specialist finding fields; raw context is not passed."""
 
-    runner = synthesizer or OperationsSynthesizer()
+    runner = synthesizer or build_synthesis_runner()
     structured_findings = [
         finding
         for field_name in SPECIALIST_FINDING_FIELDS.values()
         for finding in state[field_name]  # type: ignore[literal-required]
     ]
+    invocation = SynthesisInvocation(
+        specialist_findings=structured_findings,
+        property_scope=state["property_scope"],
+        date_scope=state["date_scope"],
+        specialist_errors=[
+            dict(error)
+            for error in state["errors"]
+            if error.get("stage")
+            in {"context_loading", "specialist_execution"}
+        ],
+    )
+    started_at = perf_counter_ns()
     try:
-        output = runner.invoke({"specialist_findings": structured_findings})
+        result = runner.invoke(invocation)
+        if isinstance(result, SynthesisExecutionResult):
+            output = result.output
+            metadata = result.metadata
+        else:
+            # Preserve the existing injection seam for tests/custom deterministic runners.
+            output = OperationsSynthesisOutput.model_validate(result)
+            metadata = SynthesisRunMetadata(
+                mode="deterministic",
+                status=SynthesisRunStatus.COMPLETED,
+                latency_ms=round((perf_counter_ns() - started_at) / 1_000_000, 3),
+                prioritized_finding_count=len(output.prioritized_findings),
+            )
     except Exception as exc:
-        message = f"Operations synthesis failed: {type(exc).__name__}: {exc}"
+        metadata = (
+            exc.metadata
+            if isinstance(exc, LLMSynthesisUnavailable)
+            else SynthesisRunMetadata(
+                mode="deterministic",
+                status=SynthesisRunStatus.FAILED,
+                latency_ms=round((perf_counter_ns() - started_at) / 1_000_000, 3),
+                prioritized_finding_count=0,
+                error_code="synthesis_failure",
+                error_type=type(exc).__name__,
+            )
+        )
         error = WorkflowError(
             stage="synthesis_execution",
-            code="synthesis_failure",
-            message=message,
+            code=metadata.error_code or "synthesis_failure",
+            message="Operations synthesis could not be completed.",
             component="operations_synthesizer",
             retryable=False,
-            details={"exception_type": type(exc).__name__},
+            details={
+                "mode": metadata.mode,
+                "provider": metadata.provider,
+                "model": metadata.model,
+                "status": metadata.status.value,
+                "fallback_used": metadata.fallback_used,
+                "exception_type": metadata.error_type or type(exc).__name__,
+            },
         )
         response = "Operations synthesis is unavailable."
         if state["unavailable_sources"]:
@@ -84,6 +138,9 @@ def operations_synthesizer_node(
             "priority_items": [],
             "proposed_actions": [],
             "synthesis_briefing": response,
+            "analysis_complete": False,
+            "synthesis_complete": False,
+            "synthesis_run": metadata.model_dump(mode="json"),
             "response_generated": False,
             "final_response": response,
             "errors": [error],
@@ -98,7 +155,7 @@ def operations_synthesizer_node(
             f"{_incomplete_analysis_warning(state['unavailable_sources'])}\n\n"
             f"{response}"
         )
-    return {
+    update: dict[str, Any] = {
         "overall_status": output.overall_status.value,
         "action_proposed": output.action_proposed,
         "operational_findings": serialized_findings,
@@ -111,9 +168,33 @@ def operations_synthesizer_node(
             action.model_dump(mode="json") for action in output.proposed_actions
         ],
         "synthesis_briefing": response,
+        "synthesis_complete": True,
+        "synthesis_run": metadata.model_dump(mode="json"),
         "response_generated": False,
         "final_response": response,
     }
+    if metadata.status == SynthesisRunStatus.FALLBACK:
+        update["errors"] = [
+            WorkflowError(
+                stage="synthesis_execution",
+                code=metadata.error_code or "llm_synthesis_fallback",
+                message=(
+                    "LLM synthesis was unavailable; deterministic synthesis "
+                    "completed the analysis."
+                ),
+                component="operations_synthesizer",
+                retryable=False,
+                details={
+                    "mode": metadata.mode,
+                    "provider": metadata.provider,
+                    "model": metadata.model,
+                    "status": metadata.status.value,
+                    "fallback_used": True,
+                    "exception_type": metadata.error_type,
+                },
+            )
+        ]
+    return update
 
 
 def _create_phase_5_graph_builder(
@@ -129,7 +210,7 @@ def _create_phase_5_graph_builder(
     """Build Phase 4 fan-out plus deferred synthesis, without a terminal edge."""
 
     configured_router = router or RequestRouter()
-    configured_synthesizer = synthesis_runner or OperationsSynthesizer()
+    configured_synthesizer = synthesis_runner or build_synthesis_runner()
     runners: dict[SpecialistName, SpecialistRunner] = {
         SpecialistName.BOOKING: BookingAgent(),
         SpecialistName.GUEST: GuestAgent(),

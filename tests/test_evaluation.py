@@ -49,6 +49,11 @@ def test_evaluation_meets_all_product_targets() -> None:
     assert metrics[EvaluationMetric.SAFE_FAILURE_HANDLING].value == 1.0
     assert metrics[EvaluationMetric.UNSUPPORTED_CRITICAL_CLAIMS].value == 0
     assert metrics[EvaluationMetric.LATENCY].value < 300_000
+    assert report.synthesis_summary["modes"] == ["deterministic"]
+    assert report.synthesis_summary["run_count"] == 8
+    assert report.synthesis_summary["model_or_schema_failure_rate"] == 0
+    assert report.synthesis_summary["fallback_count"] == 0
+    assert report.synthesis_summary["p95_latency_ms"] >= 0
 
 
 def test_tool_failures_show_retry_recovery_and_safe_escalation() -> None:

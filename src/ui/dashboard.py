@@ -39,11 +39,16 @@ SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
 
 
 def incomplete_analysis_message(result: dict[str, Any]) -> str | None:
-    """Return a host-facing warning when required source data was unavailable."""
+    """Return a host-facing warning when the operational run was incomplete."""
 
     sources = result.get("unavailable_sources", [])
     if result.get("analysis_complete", True) and not sources:
         return None
+    if not sources and result.get("synthesis_complete") is False:
+        return (
+            "Analysis incomplete: operations synthesis could not be completed. "
+            "Findings are incomplete; absence of findings is not an all-clear."
+        )
     readable_sources = ", ".join(
         str(source).removeprefix("get_").replace("_", " ")
         for source in sources

@@ -153,4 +153,5 @@ class EvaluationReport(StrictModel):
     all_targets_met: bool
     metrics: list[AggregateMetric]
     latency_summary_ms: dict[str, float]
+    synthesis_summary: dict[str, Any] = Field(default_factory=dict)
     notes: list[str]

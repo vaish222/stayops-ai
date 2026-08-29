@@ -201,6 +201,19 @@ def test_incomplete_analysis_message_names_sources_and_rejects_false_all_clear()
     ) is None
 
 
+def test_incomplete_analysis_message_identifies_synthesis_failure() -> None:
+    assert incomplete_analysis_message(
+        {
+            "analysis_complete": False,
+            "synthesis_complete": False,
+            "unavailable_sources": [],
+        }
+    ) == (
+        "Analysis incomplete: operations synthesis could not be completed. "
+        "Findings are incomplete; absence of findings is not an all-clear."
+    )
+
+
 def test_incomplete_analysis_does_not_mark_unverified_properties_ready() -> None:
     result = {
         "analysis_complete": False,

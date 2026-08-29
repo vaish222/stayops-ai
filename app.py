@@ -1081,8 +1081,8 @@ def _render_review(controller: DashboardController) -> None:
     )
     actions = request.get("proposed_actions", [])
     if not actions:
-        st.error("Some required operational data could not be checked.")
-        st.write("Please acknowledge the incomplete check before continuing.")
+        st.error("StayOps could not complete this operational check.")
+        st.write("Please acknowledge the incomplete analysis before continuing.")
         if st.button(
             "Acknowledge",
             type="primary",
@@ -1211,13 +1211,30 @@ def _render_agent_activity(result: dict[str, Any]) -> None:
     review_count = len(result.get("review_reasons", []))
     priority_count = len(result.get("priority_items", []))
     error_count = len(result.get("errors", []))
+    synthesis_run = result.get("synthesis_run") or {}
     st.markdown('<div class="flow-arrow">↓</div>', unsafe_allow_html=True)
     synth_col, gate_col = st.columns(2)
     with synth_col:
+        synthesis_status = str(synthesis_run.get("status", "completed")).replace(
+            "_", " "
+        ).title()
+        synthesis_mode = str(
+            synthesis_run.get("mode", "deterministic")
+        ).replace("_", " ").title()
+        provider = synthesis_run.get("provider")
+        model = synthesis_run.get("model")
+        model_copy = (
+            f" · {provider}/{model}" if provider and model else ""
+        )
+        latency_ms = float(synthesis_run.get("latency_ms", 0))
+        synthesis_copy = (
+            f"{synthesis_mode}{model_copy} · {synthesis_status} · "
+            f"{latency_ms:.1f}ms · {priority_count} prioritized"
+        )
         st.markdown(
             '<div class="agent-card"><strong>Operations Synthesizer</strong>'
-            f'<div class="agent-count">{priority_count}</div>'
-            '<div class="muted">prioritized findings</div></div>',
+            f'<div class="agent-count">{escape(synthesis_status)}</div>'
+            f'<div class="muted">{escape(synthesis_copy)}</div></div>',
             unsafe_allow_html=True,
         )
     with gate_col:
@@ -1235,6 +1252,7 @@ def _render_agent_activity(result: dict[str, Any]) -> None:
                 "guest_findings": result.get("guest_findings", []),
                 "turnover_findings": result.get("turnover_findings", []),
                 "maintenance_findings": result.get("maintenance_findings", []),
+                "synthesis_run": synthesis_run,
                 "agent_runs": result.get("agent_runs", []),
                 "errors": result.get("errors", []),
             }

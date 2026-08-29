@@ -1,6 +1,6 @@
 {
   "reference_date": "2026-08-28",
-  "generated_at": "2026-08-29T06:01:43.212649Z",
+  "generated_at": "2026-08-29T23:26:08.934157Z",
   "scenario_count": 9,
   "passed_scenarios": 9,
   "all_targets_met": true,
@@ -69,7 +69,7 @@
       "metric": "latency",
       "eligible_scenarios": 9,
       "passed_scenarios": 9,
-      "value": 6.289,
+      "value": 6.604,
       "unit": "milliseconds",
       "comparison": "maximum",
       "target": 300000.0,
@@ -77,13 +77,27 @@
     }
   ],
   "latency_summary_ms": {
-    "minimum": 0.043,
-    "median": 2.948,
-    "maximum": 6.289,
+    "minimum": 0.033,
+    "median": 3.136,
+    "maximum": 6.604,
     "target": 300000.0
   },
+  "synthesis_summary": {
+    "modes": [
+      "deterministic"
+    ],
+    "providers": [],
+    "models": [],
+    "run_count": 8,
+    "average_latency_ms": 0.119,
+    "p95_latency_ms": 0.165,
+    "model_or_schema_failure_rate": 0.0,
+    "grounding_failure_rate": 0.0,
+    "fallback_count": 0
+  },
   "notes": [
-    "All scenarios use fixed synthetic data and deterministic rules.",
+    "All scenarios use fixed synthetic operational data and deterministic safety rules.",
+    "Run the same scenario set separately for deterministic, Nebius, and Ollama synthesis comparisons.",
     "Latency measures automated end-to-end execution, not a human usability study.",
     "Critical claims are supported only when every cited record exists in loaded context."
   ]

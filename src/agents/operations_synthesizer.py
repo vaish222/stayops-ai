@@ -73,6 +73,14 @@ class OperationsSynthesizer:
             finding.model_copy(update={"priority_rank": rank})
             for rank, finding in enumerate(candidates, start=1)
         ]
+        return self.assemble_prioritized_findings(prioritized)
+
+    def assemble_prioritized_findings(
+        self,
+        prioritized: list[PrioritizedFinding],
+    ) -> OperationsSynthesisOutput:
+        """Deterministically derive status and executable proposals."""
+
         proposed_actions: list[ProposedAction] = []
         for finding in prioritized:
             if (
@@ -114,6 +122,20 @@ class OperationsSynthesizer:
                 affected_properties,
             ),
         )
+
+    def build_grounded_finding(
+        self,
+        contributors: list[SpecialistFinding],
+        *,
+        summary: str,
+        priority_rank: int,
+    ) -> PrioritizedFinding:
+        """Build one output item by copying all safety fields from its sources."""
+
+        return self._build_prioritized_finding(
+            contributors,
+            summary=summary,
+        ).model_copy(update={"priority_rank": priority_rank})
 
     def _combine_cross_agent_findings(
         self,

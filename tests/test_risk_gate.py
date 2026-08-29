@@ -90,10 +90,12 @@ def evaluate(
     actions: list[ProposedAction] | None = None,
     gate: RiskActionGate | None = None,
     unavailable_sources: list[str] | None = None,
+    synthesis_complete: bool = True,
 ):
     return (gate or RiskActionGate()).evaluate(
         RiskGateInput(
             write_requested=write_requested,
+            synthesis_complete=synthesis_complete,
             unavailable_sources=unavailable_sources or [],
             specialist_findings=findings or [],
             prioritized_findings=[],
@@ -134,6 +136,14 @@ def test_unavailable_source_requires_review_with_explicit_reason() -> None:
     assert reason_codes(output) == [ReviewReasonCode.SOURCE_DATA_UNAVAILABLE]
     assert output.reasons[0].source_ids == ["get_guest_messages"]
     assert "partial" in output.reasons[0].message
+
+
+def test_incomplete_synthesis_requires_review_with_explicit_reason() -> None:
+    output = evaluate(synthesis_complete=False)
+
+    assert output.requires_human_review is True
+    assert reason_codes(output) == [ReviewReasonCode.SYNTHESIS_UNAVAILABLE]
+    assert output.reasons[0].source_ids == ["operations_synthesizer"]
 
 
 @pytest.mark.parametrize(

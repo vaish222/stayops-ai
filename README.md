@@ -16,10 +16,12 @@ eight-property dataset, typed read tools, intent and date routing, conditional
 parallel specialists, operations synthesis, deterministic safety checks,
 LangGraph human review, approval-protected simulated writes, intent-aware
 answers, the polished Streamlit command center, and the evaluation harness.
+Operations synthesis can run in the deterministic baseline mode or through a
+provider-neutral structured-output LLM adapter for Nebius or local Ollama.
 
 As of August 29, 2026:
 
-- all **207 automated tests pass**;
+- all **223 automated tests pass**;
 - all **9 evaluation scenarios pass** and every aggregate target is met;
 - routing, specialist activation, priority/risk accuracy, approval enforcement,
   and safe failure handling score `1.0` in the saved deterministic evaluation;
@@ -155,7 +157,11 @@ and analyzed-record count.
 ## Operations synthesis
 
 After the selected specialists finish, the Operations Synthesizer receives only
-their structured findings. It:
+their structured findings. Deterministic synthesis remains the zero-config
+default. Optional LLM synthesis may group related findings, rank them, and write
+a concise summary, but it cannot access tools or construct executable actions.
+
+Regardless of mode, deterministic Python code:
 
 - preserves record-level evidence;
 - combines explicitly related cross-specialist findings;
@@ -165,7 +171,48 @@ their structured findings. It:
 - creates unexecuted action proposals.
 
 Cross-specialist findings are combined only when they share supporting record
-evidence. Same-property findings with unrelated evidence remain separate.
+evidence. Same-property findings with unrelated evidence remain separate. An
+LLM draft must cover every supplied finding exactly once, stay within the routed
+property scope, preserve uncertainty in conflicting evidence, cite only known
+finding IDs, and avoid unsupported record/date/time references. Invalid output
+is rejected before it reaches the safety gate.
+
+### Synthesizer configuration
+
+Use [`.env.example`](.env.example) as the configuration reference. With no
+environment settings, the application uses deterministic synthesis and needs no
+model credential.
+
+Nebius Token Factory example:
+
+```bash
+export SYNTHESIZER_MODE=llm
+export LLM_PROVIDER=nebius
+export LLM_MODEL=<provider-model-id>
+export NEBIUS_API_KEY=<nebius-api-key>
+export LLM_SYNTHESIZER_FALLBACK=deterministic
+uv run streamlit run app.py
+```
+
+Local Ollama example:
+
+```bash
+export SYNTHESIZER_MODE=llm
+export LLM_PROVIDER=ollama
+export LLM_MODEL=<local-model-name>
+export OLLAMA_BASE_URL=http://localhost:11434
+export LLM_SYNTHESIZER_FALLBACK=deterministic
+uv run streamlit run app.py
+```
+
+StayOps never reads `OPENAI_API_KEY`; Nebius uses only `NEBIUS_API_KEY` (or the
+provider-neutral `LLM_API_KEY`).
+
+`LLM_SYNTHESIZER_FALLBACK=deterministic` safely completes a run with the
+baseline synthesizer if the provider, schema validation, or grounding check
+fails. Set it to `disabled` to make the run incomplete and require human review
+instead. Agent Activity shows mode, provider, model, status, latency, finding
+count, and fallback state. It never stores or displays API keys or raw prompts.
 
 ## Deterministic risk and action gate
 
@@ -177,7 +224,8 @@ when it detects:
 - high- or critical-severity maintenance findings;
 - confidence below the configurable `0.75` threshold;
 - contradictory turnover findings about the same property and source record;
-- required source data that remains unavailable after retry; or
+- required source data that remains unavailable after retry;
+- synthesis that fails while deterministic fallback is disabled; or
 - a request classified as potentially write-producing.
 
 Drafts and read-only review proposals remain safe unless another rule applies.
@@ -289,10 +337,11 @@ the analysis as incomplete and never presents an unverified property as Ready.
 
 ## Current implementation boundaries
 
-The router, specialists, synthesizer, and response generator currently use
-deterministic typed LangChain runnables. Their graph boundaries accept injected
-runners, allowing structured-output model implementations to be added without
-changing the deterministic safety gate or approval controls.
+The router, specialists, response generator, safety gate, and approval controls
+remain deterministic typed components. The synthesizer has interchangeable
+deterministic and structured-output LLM implementations behind the same graph
+boundary. Nebius and Ollama affect only synthesis; they do not alter routing,
+retrieval, specialist analysis, HITL, write authorization, or execution.
 
 Checkpointing is in memory and supports pause/resume within the running
 application. Simulated approved changes persist through the local runtime
@@ -322,7 +371,7 @@ Run the complete automated test suite:
 uv run pytest
 ```
 
-The current suite contains 207 tests covering datasets, tools, date parsing,
+The current suite contains 223 tests covering datasets, tools, date parsing,
 routing, specialist isolation, synthesis, safety, human review, protected
 writes, response formatting, evaluation contracts, and Streamlit interactions.
 
@@ -339,7 +388,9 @@ and an explicitly approved write.
 
 Metrics include routing accuracy, specialist activation, priority/risk
 accuracy, approval enforcement, safe failure recovery, latency, and unsupported
-critical claims. Saved outputs include:
+critical claims. Aggregate reports also record synthesizer mode/provider/model,
+average and P95 synthesis latency, model/schema failure rate, and fallback
+count. Saved outputs include:
 
 - `evaluation/results/scenario_results.json`
 - per-scenario diagnostics under `evaluation/results/scenarios/`
@@ -350,6 +401,26 @@ The latest saved report records 9/9 passing scenarios with
 missed. Automated latency is not a substitute for human usability evidence; use
 [`evaluation/usability_protocol.md`](evaluation/usability_protocol.md) to test
 whether a host can identify and act on important issues in under five minutes.
+
+For a controlled A/B/C comparison, run the identical scenario set into separate
+directories:
+
+```bash
+SYNTHESIZER_MODE=deterministic \
+  uv run python -m src.evaluation.runner --output-dir evaluation/results/deterministic
+
+SYNTHESIZER_MODE=llm LLM_PROVIDER=nebius \
+  LLM_MODEL=<provider-model-id> NEBIUS_API_KEY=<nebius-api-key> \
+  uv run python -m src.evaluation.runner --output-dir evaluation/results/nebius
+
+SYNTHESIZER_MODE=llm LLM_PROVIDER=ollama \
+  LLM_MODEL=<local-model-name> \
+  uv run python -m src.evaluation.runner --output-dir evaluation/results/ollama
+```
+
+Compare task pass rates, unsupported claims, average/P95 synthesis latency,
+failure rate, and fallback count. Use at least three repeated runs per variant
+before drawing a provider conclusion.
 
 ## Demo runbook
 

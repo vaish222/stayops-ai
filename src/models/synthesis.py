@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -33,6 +33,12 @@ class ActionType(StrEnum):
     UPDATE_RECORD = "update_record"
 
 
+class SynthesisRunStatus(StrEnum):
+    COMPLETED = "completed"
+    FAILED = "failed"
+    FALLBACK = "fallback"
+
+
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -52,6 +58,92 @@ class OperationsSynthesisInput(StrictModel):
         if len(finding_ids) != len(set(finding_ids)):
             raise ValueError("specialist finding IDs must be unique")
         return findings
+
+
+class SynthesisInvocation(StrictModel):
+    """Provider-neutral graph boundary for either synthesis implementation."""
+
+    specialist_findings: list[SpecialistFinding]
+    property_scope: list[str] = Field(default_factory=list)
+    date_scope: str | None = None
+    specialist_errors: list[dict[str, Any]] = Field(default_factory=list)
+
+    @field_validator("specialist_findings")
+    @classmethod
+    def invocation_finding_ids_must_be_unique(
+        cls,
+        findings: list[SpecialistFinding],
+    ) -> list[SpecialistFinding]:
+        finding_ids = [finding.finding_id for finding in findings]
+        if len(finding_ids) != len(set(finding_ids)):
+            raise ValueError("specialist finding IDs must be unique")
+        return findings
+
+    @field_validator("property_scope")
+    @classmethod
+    def invocation_property_scope_must_be_unique(
+        cls,
+        property_scope: list[str],
+    ) -> list[str]:
+        if len(property_scope) != len(set(property_scope)):
+            raise ValueError("property_scope cannot contain duplicates")
+        return property_scope
+
+
+class LLMPrioritizedFindingDraft(StrictModel):
+    """The only issue-level decisions an LLM is allowed to make."""
+
+    priority_rank: int = Field(ge=1)
+    source_finding_ids: list[str] = Field(min_length=1)
+    summary: str = Field(min_length=1, max_length=300)
+
+    @field_validator("source_finding_ids")
+    @classmethod
+    def draft_source_ids_must_be_unique(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("source_finding_ids must be unique")
+        return values
+
+
+class LLMSynthesisDraft(StrictModel):
+    """Non-executable LLM output; evidence and actions are added deterministically."""
+
+    overall_status: OverallStatus
+    prioritized_findings: list[LLMPrioritizedFindingDraft]
+
+    @model_validator(mode="after")
+    def draft_ranks_must_be_contiguous(self) -> LLMSynthesisDraft:
+        expected = list(range(1, len(self.prioritized_findings) + 1))
+        actual = [finding.priority_rank for finding in self.prioritized_findings]
+        if actual != expected:
+            raise ValueError("LLM priority ranks must be contiguous and ordered")
+        return self
+
+
+class SynthesisRunMetadata(StrictModel):
+    mode: Literal["deterministic", "llm"]
+    provider: Literal["nebius", "ollama"] | None = None
+    model: str | None = None
+    status: SynthesisRunStatus
+    latency_ms: float = Field(ge=0)
+    prioritized_finding_count: int = Field(ge=0)
+    fallback_used: bool = False
+    error_code: str | None = None
+    error_type: str | None = None
+
+    @model_validator(mode="after")
+    def metadata_fields_must_be_consistent(self) -> SynthesisRunMetadata:
+        if self.mode == "deterministic" and (
+            self.provider is not None or self.model is not None
+        ):
+            raise ValueError("deterministic synthesis cannot include provider metadata")
+        if self.mode == "llm" and (self.provider is None or self.model is None):
+            raise ValueError("LLM synthesis requires provider and model metadata")
+        if self.fallback_used != (self.status == SynthesisRunStatus.FALLBACK):
+            raise ValueError("fallback_used must match fallback status")
+        if self.status == SynthesisRunStatus.COMPLETED and self.error_code is not None:
+            raise ValueError("completed synthesis cannot include an error code")
+        return self
 
 
 class PrioritizedFinding(StrictModel):
@@ -185,3 +277,10 @@ class OperationsSynthesisOutput(StrictModel):
         if len(action_ids) != len(set(action_ids)):
             raise ValueError("proposed action IDs must be unique")
         return self
+
+
+class SynthesisExecutionResult(StrictModel):
+    """Synthesis output plus safe, non-secret execution metadata."""
+
+    output: OperationsSynthesisOutput
+    metadata: SynthesisRunMetadata

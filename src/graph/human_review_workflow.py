@@ -39,6 +39,9 @@ def _review_request(
     source_failure_only = bool(state["unavailable_sources"]) and not state[
         "proposed_actions"
     ]
+    synthesis_failure_only = (
+        not state["synthesis_complete"] and not state["proposed_actions"]
+    )
     request = HumanReviewRequest(
         request_id=state["request_id"],
         question=(
@@ -48,7 +51,12 @@ def _review_request(
                 "Required operational data is unavailable. Acknowledge the "
                 "incomplete analysis or reject it?"
                 if source_failure_only
-                else "Review the proposal and evidence: approve, edit, or reject?"
+                else (
+                    "StayOps could not complete the synthesis. Acknowledge the "
+                    "incomplete analysis or reject it?"
+                    if synthesis_failure_only
+                    else "Review the proposal and evidence: approve, edit, or reject?"
+                )
             )
         ),
         proposed_actions=state["proposed_actions"],

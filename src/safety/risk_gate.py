@@ -85,6 +85,18 @@ class RiskActionGate:
                 )
             )
 
+        if not context.synthesis_complete:
+            reasons.append(
+                HumanReviewReason(
+                    code=ReviewReasonCode.SYNTHESIS_UNAVAILABLE,
+                    message=(
+                        "Operations synthesis could not be completed; human "
+                        "review is required before continuing."
+                    ),
+                    source_ids=["operations_synthesizer"],
+                )
+            )
+
         if context.write_requested:
             reasons.append(
                 HumanReviewReason(

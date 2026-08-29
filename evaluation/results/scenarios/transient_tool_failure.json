@@ -3,7 +3,7 @@
   "name": "Transient guest-message failure recovers on retry",
   "category": "tool_failure",
   "passed": true,
-  "latency_ms": 2.623,
+  "latency_ms": 2.78,
   "metrics": [
     {
       "metric": "routing_accuracy",
@@ -108,7 +108,7 @@
         "maximum_ms": 300000
       },
       "observed": {
-        "latency_ms": 2.623
+        "latency_ms": 2.78
       },
       "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
     },
@@ -141,6 +141,17 @@
     "unavailable_sources": [],
     "final_response": "Overall status: needs attention. 1 prioritized item across 1 affected property.",
     "response_generated": false,
+    "synthesis_run": {
+      "mode": "deterministic",
+      "provider": null,
+      "model": null,
+      "status": "completed",
+      "latency_ms": 0.105,
+      "prioritized_finding_count": 1,
+      "fallback_used": false,
+      "error_code": null,
+      "error_type": null
+    },
     "finding_categories": [
       "guest_maintenance_report"
     ],
@@ -152,7 +163,7 @@
       {
         "agent": "guest",
         "status": "succeeded",
-        "latency_ms": 0.106,
+        "latency_ms": 0.118,
         "finding_count": 1,
         "warning_count": 0,
         "analyzed_record_count": 1,

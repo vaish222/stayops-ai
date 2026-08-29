@@ -49,11 +49,17 @@ from src.models.risk import (
 from src.models.response import ResponseGenerationInput, ResponseGenerationOutput
 from src.models.synthesis import (
     ActionType,
+    LLMPrioritizedFindingDraft,
+    LLMSynthesisDraft,
     OperationsSynthesisInput,
     OperationsSynthesisOutput,
     OverallStatus,
     PrioritizedFinding,
     ProposedAction,
+    SynthesisExecutionResult,
+    SynthesisInvocation,
+    SynthesisRunMetadata,
+    SynthesisRunStatus,
 )
 from src.models.write import (
     ApprovalGrant,
@@ -89,6 +95,8 @@ __all__ = [
     "MaintenanceTicket",
     "MaintenanceAgentInput",
     "HumanReviewReason",
+    "LLMPrioritizedFindingDraft",
+    "LLMSynthesisDraft",
     "MessageCategory",
     "MessageDirection",
     "MessageUrgency",
@@ -113,6 +121,10 @@ __all__ = [
     "SpecialistInput",
     "SpecialistName",
     "SpecialistOutput",
+    "SynthesisExecutionResult",
+    "SynthesisInvocation",
+    "SynthesisRunMetadata",
+    "SynthesisRunStatus",
     "TurnoverAgentInput",
     "WriteAttempt",
     "WriteAttemptStatus",

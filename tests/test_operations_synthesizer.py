@@ -23,6 +23,7 @@ from src.models import (
     OverallStatus,
     SpecialistFinding,
     SpecialistName,
+    SynthesisInvocation,
 )
 
 
@@ -266,14 +267,20 @@ def test_synthesizer_is_a_typed_langchain_runnable() -> None:
 
 class RecordingSynthesizer:
     def __init__(self) -> None:
-        self.calls: list[OperationsSynthesisInput] = []
+        self.calls: list[SynthesisInvocation] = []
         self.delegate = OperationsSynthesizer()
 
-    def invoke(self, payload: dict) -> OperationsSynthesisOutput:
-        assert set(payload) == {"specialist_findings"}
-        context = OperationsSynthesisInput.model_validate(payload)
+    def invoke(
+        self,
+        payload: SynthesisInvocation | dict,
+    ) -> OperationsSynthesisOutput:
+        context = SynthesisInvocation.model_validate(payload)
         self.calls.append(context)
-        return self.delegate.invoke(context)
+        return self.delegate.invoke(
+            OperationsSynthesisInput(
+                specialist_findings=context.specialist_findings,
+            )
+        )
 
 
 class FailingSynthesizer:
@@ -302,6 +309,7 @@ def test_phase_5_graph_synthesizes_once_after_all_parallel_specialists() -> None
         SpecialistName.TURNOVER,
         SpecialistName.MAINTENANCE,
     }
+    assert recorder.calls[0].date_scope == "2026-08-28"
     assert result["overall_status"] == "needs_attention"
     assert result["operational_findings"]
     assert result["priority_items"]
