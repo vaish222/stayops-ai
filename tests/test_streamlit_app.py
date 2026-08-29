@@ -83,7 +83,6 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     assert {button.label for button in app.button} >= {
         "Ask StayOps",
         "Approve & Send",
-        "Edit",
         "Reject",
         "What's urgent today?",
         "Who's checking in?",
@@ -96,7 +95,8 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
         "This action will send a message to the cleaner." in item.value
         for item in app.caption
     )
-    assert len(app.text_area) == 6
+    assert "Edit" not in {button.label for button in app.button}
+    assert len(app.text_area) == 0
 
 
 def test_portfolio_filter_and_view_property_are_interactive() -> None:
@@ -166,7 +166,7 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     controller = app.session_state["stayops_controller"]
     assert controller.last_query == query
     assert controller.pending_review is None
-    assert not {"Approve & Send", "Approve & Update", "Edit", "Reject"}.intersection(
+    assert not {"Approve & Send", "Approve & Update", "Reject"}.intersection(
         button.label for button in app.button
     )
     assert any("StayOps checked your operations" in item.value for item in app.info)
@@ -231,18 +231,12 @@ def test_operations_tables_use_human_readable_values() -> None:
     assert arrivals[0]["Source"] == "Marketplace"
 
 
-def test_edit_reconfirm_and_approve_executes_exact_ui_revision() -> None:
+def test_approve_executes_the_reviewed_action_without_edit_control() -> None:
     app = render_app()
-    edited_message = "Please confirm Lake House will be ready by 1 PM."
-    app.text_area[0].input(edited_message)
-
-    app = next(button for button in app.button if button.label == "Edit").click().run()
-
-    assert app.exception == []
     controller = app.session_state["stayops_controller"]
-    assert controller.pending_review is not None
-    assert app.text_area[0].value == edited_message
-    assert any("reconfirmation" in item.value for item in app.warning)
+    reviewed_message = controller.pending_review["proposed_actions"][0]["description"]
+    assert "Edit" not in {button.label for button in app.button}
+    assert len(app.text_area) == 0
 
     app = next(
         button for button in app.button if button.label == "Approve & Send"
@@ -252,7 +246,7 @@ def test_edit_reconfirm_and_approve_executes_exact_ui_revision() -> None:
     controller = app.session_state["stayops_controller"]
     assert controller.pending_review is None
     assert controller.result["executed_actions"][0]["result"]["message"] == (
-        edited_message
+        reviewed_message
     )
     assert any("1 simulated action executed" in item.value for item in app.success)
 

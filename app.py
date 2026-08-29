@@ -963,19 +963,16 @@ def _render_review(controller: DashboardController) -> None:
             st.markdown("**Why your approval is required**")
             st.caption(_approval_explanation(action))
             st.markdown("**Proposed action**")
-            edit_key = f"edited_action_{controller.thread_id}_{action_id}"
-            edited_description = st.text_area(
-                "Action text",
-                value=action["description"],
-                key=edit_key,
-                label_visibility="collapsed",
+            st.markdown(
+                f'<div class="detail-line">{escape(action["description"])}</div>',
+                unsafe_allow_html=True,
             )
             supporting = evidence_for_action(action, request.get("findings", []))
             plain_evidence = _plain_evidence_lines(supporting, result)
             with st.expander("Why StayOps suggested this"):
                 for line in plain_evidence:
                     st.write(line)
-            approve_col, edit_col, reject_col = st.columns(3)
+            approve_col, reject_col = st.columns(2)
             if approve_col.button(
                 approve_label,
                 type="primary",
@@ -983,19 +980,6 @@ def _render_review(controller: DashboardController) -> None:
                 key=f"approve_{controller.thread_id}_{action_id}",
             ):
                 _resume_review(controller, "approve", action_id)
-                st.rerun()
-            if edit_col.button(
-                "Edit",
-                width="stretch",
-                disabled=not edited_description.strip(),
-                key=f"edit_{controller.thread_id}_{action_id}",
-            ):
-                _resume_review(
-                    controller,
-                    "edit",
-                    action_id,
-                    edited_description.strip(),
-                )
                 st.rerun()
             if reject_col.button(
                 "Reject",
