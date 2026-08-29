@@ -31,6 +31,22 @@ errors. Tools support property filtering, and dated records support inclusive
 date filtering. `FailureSimulator` can deterministically fail the first N calls
 to any tool so retry and recovery behavior can be tested without randomness.
 
+## Phase 2: state and request routing
+
+`StayOpsState` defines the complete typed workflow state and is initialized by
+`create_initial_state()`. The Pydantic request router extracts an operational
+intent, canonical property IDs, an ISO date or date range, and whether the host
+is asking for a write action. Relative dates use an injectable reference date
+for deterministic tests.
+
+The current LangGraph is intentionally limited to:
+
+```text
+START -> request_router -> END
+```
+
+No specialist agents or operational synthesis run in Phase 2.
+
 Install and validate with:
 
 ```bash
