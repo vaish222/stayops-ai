@@ -102,6 +102,40 @@ Drafts and read-only review proposals remain safe unless another rule applies.
 If gate evaluation fails, the workflow defaults to requiring review. Phase 6
 stops after this decision: it does not pause for a person or execute any action.
 
+## Phase 7: checkpointed human review
+
+`build_phase_7_graph()` adds a LangGraph `interrupt()` only when the Phase 6
+gate requires review. The JSON-serializable interrupt payload contains the
+proposed actions, prioritized findings with evidence, explicit review reasons,
+and the available Approve, Edit, and Reject decisions.
+
+The graph uses an in-memory checkpointer by default. Callers provide a stable
+thread ID and resume that same thread with `Command(resume=...)`:
+
+```python
+from langgraph.types import Command
+
+config = {"configurable": {"thread_id": "review-123"}}
+paused = graph.invoke(initial_state, config=config)
+request = paused["__interrupt__"][0].value
+
+completed = graph.invoke(
+    Command(
+        resume={
+            "decision": "approve",
+            "action_id": request["proposed_actions"][0]["action_id"],
+        }
+    ),
+    config=config,
+)
+```
+
+Approve and Reject complete the review. Edit can change only a selected
+proposal's description, preserves its type and evidence links, and pauses again
+for reconfirmation. Invalid responses remain interrupted with a validation
+message. Phase 7 records decisions but contains no write tools or action
+execution nodes; those remain reserved for Phase 8.
+
 Install and validate with:
 
 ```bash

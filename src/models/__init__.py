@@ -16,6 +16,12 @@ from src.models.findings import (
     SpecialistOutput,
     TurnoverAgentInput,
 )
+from src.models.human_review import (
+    HumanDecisionRecord,
+    HumanReviewRequest,
+    HumanReviewResponse,
+    ReviewDecision,
+)
 from src.models.operations import (
     CleaningSchedule,
     CleaningStatus,
@@ -63,6 +69,9 @@ __all__ = [
     "FindingSeverity",
     "GuestMessage",
     "GuestAgentInput",
+    "HumanDecisionRecord",
+    "HumanReviewRequest",
+    "HumanReviewResponse",
     "MaintenanceSeverity",
     "MaintenanceStatus",
     "MaintenanceTicket",
@@ -81,6 +90,7 @@ __all__ = [
     "Reservation",
     "ReservationStatus",
     "ReviewReasonCode",
+    "ReviewDecision",
     "RiskGateConfig",
     "RiskGateInput",
     "RiskGateOutput",

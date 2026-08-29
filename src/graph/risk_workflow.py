@@ -6,7 +6,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Protocol
 
-from langgraph.graph import END
+from langgraph.graph import END, StateGraph
 
 from src.agents import RequestRouter
 from src.graph.parallel_workflow import SPECIALIST_FINDING_FIELDS, SpecialistRunner
@@ -81,7 +81,7 @@ def risk_gate_node(
     }
 
 
-def build_phase_6_graph(
+def _create_phase_6_graph_builder(
     *,
     router: RequestRouter | None = None,
     reference_date: date | None = None,
@@ -90,8 +90,8 @@ def build_phase_6_graph(
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
     gate_runner: GateRunner | None = None,
-):
-    """Compile Phase 5 plus the deterministic gate, then stop without HITL."""
+) -> StateGraph:
+    """Build Phase 5 plus the deterministic gate, without a terminal edge."""
 
     configured_gate = gate_runner or RiskActionGate()
     graph_builder = _create_phase_5_graph_builder(
@@ -108,5 +108,29 @@ def build_phase_6_graph(
 
     graph_builder.add_node("risk_action_gate", gate_node)
     graph_builder.add_edge("operations_synthesizer", "risk_action_gate")
+    return graph_builder
+
+
+def build_phase_6_graph(
+    *,
+    router: RequestRouter | None = None,
+    reference_date: date | None = None,
+    data_dir: str | Path = DEFAULT_DATA_DIR,
+    failure_simulator: FailureSimulator | None = None,
+    specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
+    synthesis_runner: SynthesisRunner | None = None,
+    gate_runner: GateRunner | None = None,
+):
+    """Compile Phase 6 and stop immediately after the deterministic gate."""
+
+    graph_builder = _create_phase_6_graph_builder(
+        router=router,
+        reference_date=reference_date,
+        data_dir=data_dir,
+        failure_simulator=failure_simulator,
+        specialist_runners=specialist_runners,
+        synthesis_runner=synthesis_runner,
+        gate_runner=gate_runner,
+    )
     graph_builder.add_edge("risk_action_gate", END)
     return graph_builder.compile(name="stayops_phase_6_risk_action_gate")
