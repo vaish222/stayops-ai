@@ -41,7 +41,10 @@ def render_app(view: str | None = None) -> AppTest:
 
 class FailureOnlyDashboardController(DashboardController):
     def load_daily_briefing(self) -> dict:
-        result = self.run_query("Are there unresolved guest issues today?")
+        result = self.run_query(
+            "Are there unresolved guest issues today?",
+            user_initiated=False,
+        )
         self.daily_result = result
         self.daily_thread_id = self.thread_id
         return result
@@ -89,9 +92,7 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     assert len(attention_cards) == 2
     assert all("needs_attention" in card and "watch" not in card for card in attention_cards)
     assert "2 properties require action · 3 more properties are on watch" in page_markup
-    assert "✨ StayOps Answer" in page_markup
-    assert page_markup.count("✨ StayOps Answer") == 1
-    assert page_markup.index("Ask StayOps") < page_markup.index("✨ StayOps Answer")
+    assert "✨ StayOps Answer" not in page_markup
     assert "None in scope" not in page_markup
     assert "Prioritized issues" not in page_markup
     property_selector = app.selectbox(key="property_drilldown")
@@ -261,6 +262,7 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     assert app.exception == []
     controller = app.session_state["stayops_controller"]
     assert controller.last_query == query
+    assert controller.has_user_query is True
     assert controller.pending_review is None
     assert not {"Approve & Send", "Approve & Update", "Reject"}.intersection(
         button.label for button in app.button
@@ -373,8 +375,7 @@ def test_reject_control_records_decision_without_execution() -> None:
     assert controller.pending_review is not None
     assert any("Action rejected — nothing was sent" in item.value for item in app.info)
     page_markup = "\n".join(item.value for item in app.markdown)
-    assert "Needs Action items require attention" in page_markup
-    assert page_markup.count("✨ StayOps Answer") == 1
+    assert "✨ StayOps Answer" not in page_markup
 
 
 def test_source_failure_is_prominent_and_requires_acknowledgement() -> None:
@@ -385,6 +386,7 @@ def test_source_failure_is_prominent_and_requires_acknowledgement() -> None:
     assert any("findings are partial" in item.value.lower() for item in app.error)
     assert "Acknowledge" in {button.label for button in app.button}
     page_markup = "\n".join(item.value for item in app.markdown)
+    assert "✨ StayOps Answer" not in page_markup
     assert '<div class="value">0</div><div class="label">Needs Action</div>' in page_markup
     assert '<div class="value">8</div><div class="label">Watch</div>' in page_markup
     assert '<div class="value">0</div><div class="label">Ready for Guests</div>' in page_markup

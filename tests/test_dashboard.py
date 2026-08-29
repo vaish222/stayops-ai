@@ -35,6 +35,7 @@ def test_daily_dashboard_summarizes_all_eight_properties() -> None:
     counts = count_property_health(summaries)
 
     assert len(summaries) == 8
+    assert controller.has_user_query is False
     assert counts == {
         PropertyHealth.NEEDS_ATTENTION: 2,
         PropertyHealth.WATCH: 3,
@@ -96,6 +97,7 @@ def test_ask_stayops_uses_new_thread_without_replacing_daily_portfolio() -> None
     )
 
     assert controller.thread_id == "dashboard-query"
+    assert controller.has_user_query is True
     assert controller.pending_review is None
     assert query_result["property_scope"] == ["prop_city_loft"]
     assert controller.daily_result is not None

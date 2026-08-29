@@ -184,14 +184,20 @@ class DashboardController:
         self.thread_id: str | None = None
         self.daily_thread_id: str | None = None
         self.last_query: str = ""
+        self.has_user_query: bool = False
 
     def load_daily_briefing(self) -> dict[str, Any]:
-        result = self.run_query(DEFAULT_DAILY_QUERY)
+        result = self.run_query(DEFAULT_DAILY_QUERY, user_initiated=False)
         self.daily_result = result
         self.daily_thread_id = self.thread_id
         return result
 
-    def run_query(self, query: str) -> dict[str, Any]:
+    def run_query(
+        self,
+        query: str,
+        *,
+        user_initiated: bool = True,
+    ) -> dict[str, Any]:
         normalized = query.strip()
         if not normalized:
             raise ValueError("Ask StayOps requires a non-empty query")
@@ -202,6 +208,7 @@ class DashboardController:
             create_initial_state(normalized, request_id=self.thread_id),
             config=self.config,
         )
+        self.has_user_query = user_initiated
         return self.result
 
     @property

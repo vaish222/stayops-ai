@@ -1152,6 +1152,8 @@ def _stayops_answer(controller: DashboardController) -> str:
 
 
 def _render_stayops_answer(controller: DashboardController) -> None:
+    if not controller.has_user_query:
+        return
     with st.container(border=True, key="stayops_answer"):
         st.markdown('<div id="stayops-answer"></div>', unsafe_allow_html=True)
         st.markdown("### ✨ StayOps Answer")
