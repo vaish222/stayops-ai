@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
@@ -61,6 +62,33 @@ def test_all_six_datasets_parse_as_pydantic_models(dataset: StayOpsDataset) -> N
         dataset.maintenance_tickets,
         dataset.property_rules,
     ) for record in group)
+
+
+def test_expanded_operational_data_covers_every_property(
+    dataset: StayOpsDataset,
+) -> None:
+    property_ids = {prop.id for prop in dataset.properties}
+    reservations_by_property = Counter(
+        item.property_id for item in dataset.reservations
+    )
+    messages_by_property = Counter(
+        item.property_id for item in dataset.guest_messages
+    )
+    cleanings_by_property = Counter(
+        item.property_id for item in dataset.cleaning_schedule
+    )
+    maintenance_by_property = Counter(
+        item.property_id for item in dataset.maintenance_tickets
+    )
+
+    assert len(dataset.reservations) == 21
+    assert len(dataset.guest_messages) == 17
+    assert len(dataset.cleaning_schedule) == 16
+    assert len(dataset.maintenance_tickets) == 14
+    assert all(reservations_by_property[property_id] >= 2 for property_id in property_ids)
+    assert all(messages_by_property[property_id] >= 1 for property_id in property_ids)
+    assert all(cleanings_by_property[property_id] >= 1 for property_id in property_ids)
+    assert all(maintenance_by_property[property_id] >= 1 for property_id in property_ids)
 
 
 def test_lake_house_has_unconfirmed_same_day_turnover(dataset: StayOpsDataset) -> None:
