@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from tempfile import mkdtemp
+
 from src.models import WriteToolName
+from src.tools import SimulatedOperationsStore
 from src.ui import (
     DashboardController,
     PropertyHealth,
@@ -15,7 +19,12 @@ from src.ui import (
 
 def deterministic_controller() -> DashboardController:
     thread_ids = iter(["dashboard-daily", "dashboard-query"])
-    return DashboardController(thread_id_factory=lambda: next(thread_ids))
+    return DashboardController(
+        thread_id_factory=lambda: next(thread_ids),
+        runtime_store=SimulatedOperationsStore(
+            Path(mkdtemp(prefix="stayops-dashboard-test-"))
+        ),
+    )
 
 
 def test_daily_dashboard_summarizes_all_eight_properties() -> None:
@@ -110,7 +119,10 @@ def test_controller_resumes_approval_on_same_thread_and_exposes_execution() -> N
     )
 
     assert controller.thread_id == "dashboard-daily"
-    assert controller.pending_review is None
+    assert controller.pending_review is not None
+    assert len(controller.pending_review["proposed_actions"]) == (
+        len(request["proposed_actions"]) - 1
+    )
     assert completed["human_decision"]["decision"] == "approve"
     assert completed["executed_actions"][0]["tool_name"] == (
         WriteToolName.SEND_CLEANER_MESSAGE

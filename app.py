@@ -29,6 +29,32 @@ STATUS_ICONS = {
     PropertyHealth.WATCH: "◆",
     PropertyHealth.READY: "✓",
 }
+OPERATIONS_VIEW_TO_TAB = {
+    "attention": "Needs Your Attention",
+    "guest_messages": "Guest Messages",
+    "turnovers": "Turnovers",
+    "maintenance": "Maintenance",
+    "arrivals": "Arrivals",
+}
+OPERATIONS_TAB_TO_VIEW = {
+    tab_label: view for view, tab_label in OPERATIONS_VIEW_TO_TAB.items()
+}
+SIDEBAR_NAVIGATION = (
+    ("command_center", "Command Center"),
+    ("properties", "Properties"),
+    ("guest_messages", "Guest Messages"),
+    ("turnovers", "Turnovers"),
+    ("maintenance", "Maintenance"),
+    ("approvals", "Approvals"),
+)
+SIDEBAR_VIEW_TO_LABEL = dict(SIDEBAR_NAVIGATION)
+SIDEBAR_LABEL_TO_VIEW = {
+    label: view for view, label in SIDEBAR_NAVIGATION
+}
+VALID_NAVIGATION_VIEWS = {
+    *OPERATIONS_VIEW_TO_TAB,
+    *(view for view, _ in SIDEBAR_NAVIGATION),
+}
 
 
 def _install_theme() -> None:
@@ -140,8 +166,14 @@ def _install_theme() -> None:
         .agent-status { color:#526570; font-size:.8rem; line-height:1.35; }
         .flow-arrow { text-align:center; color:#789098; font-size:1.25rem; line-height:1; padding:.15rem; }
         .sidebar-brand { font-size:1.1rem; font-weight:850; color:var(--navy); letter-spacing:.08em; margin:.15rem 0 1rem; }
-        .sidebar-nav a { display:block; color:#38525f; padding:.52rem .62rem; border-radius:9px; text-decoration:none; font-weight:650; font-size:.88rem; }
-        .sidebar-nav a:first-child { background:#d4e7e1; color:var(--teal-dark); }
+        .st-key-sidebar_navigation [role="radiogroup"] { gap:.22rem; }
+        .st-key-sidebar_navigation label {
+            background:transparent !important; border:0 !important; border-radius:9px;
+            color:#38525f; padding:.42rem .55rem !important; font-weight:650;
+        }
+        .st-key-sidebar_navigation label:has(input:checked) {
+            background:#d4e7e1 !important; color:var(--teal-dark);
+        }
         [data-testid="stRadio"] > div { gap:.4rem; }
         [data-testid="stRadio"] label { background:#fffefb; border:1px solid var(--line); border-radius:999px; padding:.12rem .5rem; }
         div.stButton > button[kind="primary"] {
@@ -166,6 +198,52 @@ def _controller() -> DashboardController:
     if controller.daily_result is None:
         controller.load_daily_briefing()
     return controller
+
+
+def _requested_view() -> str:
+    """Return a validated URL-backed dashboard destination."""
+
+    requested = st.query_params.get("view", "command_center")
+    if isinstance(requested, list):
+        requested = requested[-1] if requested else "command_center"
+    return requested if requested in VALID_NAVIGATION_VIEWS else "command_center"
+
+
+def _sync_sidebar_view() -> None:
+    """Keep deep-link state aligned with the native sidebar selection."""
+
+    selected_label = st.session_state.get("sidebar_navigation")
+    selected_view = SIDEBAR_LABEL_TO_VIEW.get(selected_label)
+    if selected_view is not None:
+        st.query_params["view"] = selected_view
+
+
+def _render_sidebar_navigation(current_view: str) -> None:
+    requested_label = SIDEBAR_VIEW_TO_LABEL.get(
+        current_view,
+        "Command Center",
+    )
+    if (
+        "sidebar_navigation" not in st.session_state
+        or st.session_state.sidebar_navigation != requested_label
+    ):
+        st.session_state.sidebar_navigation = requested_label
+    st.radio(
+        "Navigation",
+        [label for _, label in SIDEBAR_NAVIGATION],
+        key="sidebar_navigation",
+        on_change=_sync_sidebar_view,
+        label_visibility="collapsed",
+    )
+
+
+def _sync_operations_view() -> None:
+    """Keep the URL and sidebar highlight aligned with a manual tab change."""
+
+    selected_tab = st.session_state.get("operations_tab")
+    selected_view = OPERATIONS_TAB_TO_VIEW.get(selected_tab)
+    if selected_view is not None:
+        st.query_params["view"] = selected_view
 
 
 def _status_pill(health: PropertyHealth) -> str:
@@ -212,6 +290,16 @@ def _humanize(value: Any) -> str:
     if text == "synthetic_marketplace":
         return "Marketplace"
     return text.replace("_", " ").title()
+
+
+def _cleaner_display(name: str) -> str:
+    return f"Assigned cleaner: {name}"
+
+
+def _confirmation_display(status: str) -> str:
+    if status == "pending":
+        return "Confirmation pending"
+    return _humanize(status)
 
 
 def _arrivals_today(result: dict[str, Any]) -> int:
@@ -262,8 +350,9 @@ def _plain_evidence_lines(
                 )
             elif source == "cleaning_schedule":
                 lines.append(
-                    f"Cleaning with {record['cleaner_name']} is "
-                    f"{record['confirmation_status'].replace('_', ' ')}; target completion "
+                    f"{_cleaner_display(record['cleaner_name'])}; "
+                    f"{_confirmation_display(record['confirmation_status']).lower()}; "
+                    "target completion "
                     f"is {_format_time(record.get('target_complete_time'))}."
                 )
             elif source == "maintenance_tickets":
@@ -318,6 +407,17 @@ def _resume_review(
 ) -> None:
     review = controller.pending_review or {}
     acknowledgement_only = not review.get("proposed_actions")
+    previous_execution_count = len(
+        (controller.result or {}).get("executed_actions", [])
+    )
+    selected_action = next(
+        (
+            action
+            for action in review.get("proposed_actions", [])
+            if action.get("action_id") == action_id
+        ),
+        {},
+    )
     try:
         result = controller.resume_review(
             decision,
@@ -327,23 +427,44 @@ def _resume_review(
     except (RuntimeError, ValueError) as exc:
         st.session_state.stayops_notice = ("error", str(exc))
         return
-    if controller.pending_review is not None:
+    remaining_review = controller.pending_review
+    remaining_count = len(
+        (remaining_review or {}).get("proposed_actions", [])
+    )
+    latest_execution_count = max(
+        0,
+        len(result.get("executed_actions", [])) - previous_execution_count,
+    )
+    if decision == "approve" and acknowledgement_only:
+        st.session_state.stayops_notice = (
+            "success",
+            "Incomplete analysis acknowledged. No simulated action was executed.",
+        )
+    elif decision == "approve":
+        tool_name = selected_action.get("tool_name")
+        outcome = (
+            "Approved and sent — simulation only."
+            if tool_name in {"send_guest_message", "send_cleaner_message"}
+            else "Approved and updated — simulation only."
+            if tool_name == "update_maintenance_status"
+            else "Approved — no write was required."
+        )
+        if latest_execution_count == 0 and selected_action.get("tool_name"):
+            outcome = "Approval recorded, but the simulated write did not complete."
+        if remaining_count:
+            noun = "action" if remaining_count == 1 else "actions"
+            outcome += f" {remaining_count} {noun} still need review."
+        st.session_state.stayops_notice = ("success", outcome)
+    elif decision == "reject" and remaining_count:
+        noun = "action" if remaining_count == 1 else "actions"
+        st.session_state.stayops_notice = (
+            "info",
+            f"Action rejected — nothing was sent. {remaining_count} {noun} still need review.",
+        )
+    elif decision == "edit" and remaining_review is not None:
         st.session_state.stayops_notice = (
             "warning",
             "The edited action is ready for reconfirmation.",
-        )
-    elif decision == "approve":
-        execution_count = len(result.get("executed_actions", []))
-        st.session_state.stayops_notice = (
-            "success",
-            (
-                "Incomplete analysis acknowledged. No simulated action was executed."
-                if acknowledgement_only and execution_count == 0
-                else
-                f"Approved. {execution_count} simulated action executed."
-                if execution_count == 1
-                else f"Approved. {execution_count} simulated actions executed."
-            ),
         )
     else:
         st.session_state.pop("stayops_notice", None)
@@ -400,7 +521,8 @@ def _attention_key_line(
             timing.append(f"Check-in {_format_time(arrival.get('check_in_time'))}")
         if cleanings:
             timing.append(
-                f"Cleaning {_humanize(cleanings[0].get('confirmation_status')).lower()}"
+                "Cleaning "
+                f"{_confirmation_display(cleanings[0].get('confirmation_status')).lower()}"
             )
         return " → ".join(timing[:2]) + (f" · {timing[2]}" if len(timing) > 2 else "")
     if categories.intersection(
@@ -479,7 +601,8 @@ def _render_attention(result: dict[str, Any]) -> None:
                 f'<div class="issue-title">{escape(issue_title)}</div>'
                 f'<div class="detail-line">{escape(key_line)}</div>'
                 f'<div class="detail-line"><strong>Next:</strong> {escape(next_action)}</div>'
-                '<a class="attention-link" href="#approval-center">Review &amp; Handle →</a>'
+                '<a class="attention-link" href="#approval-center">'
+                'Review &amp; Handle →</a>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -561,7 +684,10 @@ def _property_card_details(
         if item.get("property_id") == property_id
     ]
     if cleanings:
-        operations = f"Cleaning {_humanize(cleanings[0]['confirmation_status'])}"
+        operations = (
+            "Cleaning "
+            f"{_confirmation_display(cleanings[0]['confirmation_status']).lower()}"
+        )
     elif maintenance:
         operations = f"Maintenance {_humanize(maintenance[0]['status'])}"
     else:
@@ -689,8 +815,9 @@ def _render_property_drilldown(
         if cleanings:
             for item in cleanings:
                 st.write(
-                    f"{_format_date(item['scheduled_date'])} · {item['cleaner_name']} · "
-                    f"{_humanize(item['confirmation_status'])}"
+                    f"{_format_date(item['scheduled_date'])} · "
+                    f"{_cleaner_display(item['cleaner_name'])} · "
+                    f"{_confirmation_display(item['confirmation_status'])}"
                 )
         else:
             st.caption("No cleaning jobs in scope.")
@@ -803,11 +930,18 @@ def _render_cleanings(result: dict[str, Any], property_id: str | None) -> None:
             {
                 "Property": _property_name(result, item["property_id"]),
                 "Date": _format_date(item["scheduled_date"]),
-                "Cleaner": item["cleaner_name"],
+                "Assigned cleaner": item["cleaner_name"],
                 "Window start": _format_time(item["window_start"]),
                 "Target complete": _format_time(item["target_complete_time"]),
-                "Confirmation": _humanize(item["confirmation_status"]),
+                "Confirmation": _confirmation_display(
+                    item["confirmation_status"]
+                ),
                 "Status": _humanize(item["status"]),
+                "Contact": (
+                    "Reminder sent (simulated)"
+                    if "Simulated reminder sent" in (item.get("notes") or "")
+                    else "No reminder sent"
+                ),
             }
             for item in cleanings
         ],
@@ -875,20 +1009,31 @@ def _render_upcoming_arrivals(
 def _render_operations_views(
     result: dict[str, Any],
     property_id: str | None,
+    requested_view: str,
 ) -> None:
     _section_heading(
         "operations-workspace",
         "Operations Workspace",
         "See the operational details behind every StayOps alert.",
     )
+    tab_labels = list(OPERATIONS_VIEW_TO_TAB.values())
+    requested_tab = OPERATIONS_VIEW_TO_TAB.get(
+        requested_view,
+        "Needs Your Attention",
+    )
+    if (
+        "operations_tab" not in st.session_state
+        or (
+            requested_view in OPERATIONS_VIEW_TO_TAB
+            and st.session_state.operations_tab != requested_tab
+        )
+    ):
+        st.session_state.operations_tab = requested_tab
     priorities, messages, cleanings, maintenance, arrivals = st.tabs(
-        [
-            "Needs Your Attention",
-            "Guest Messages",
-            "Turnovers",
-            "Maintenance",
-            "Arrivals",
-        ]
+        tab_labels,
+        default=requested_tab,
+        key="operations_tab",
+        on_change=_sync_operations_view,
     )
     with priorities:
         _render_priorities(result, property_id)
@@ -905,30 +1050,35 @@ def _render_operations_views(
 def _approval_explanation(action: dict[str, Any]) -> str:
     tool_name = action.get("tool_name")
     if tool_name == "send_guest_message":
-        return "This action will send a message to the guest."
+        return "This action will simulate sending a message to the guest."
     if tool_name == "send_cleaner_message":
-        return "This action will send a message to the cleaner."
+        return "This action will simulate sending a message to the cleaner."
     if tool_name == "update_maintenance_status":
-        return "This action will update a maintenance record."
+        return "This action will update the simulated maintenance record."
     return "This operational decision requires your review before StayOps continues."
 
 
 def _render_review(controller: DashboardController) -> None:
     request = controller.pending_review
-    if request is None:
-        return
-    result = controller.result or controller.daily_result or {}
     _section_heading(
         "approval-center",
         "Human Approvals",
         "Review every proposed write before it can be simulated.",
     )
+    if request is None:
+        st.info("No approvals are pending for the latest StayOps request.")
+        return
+    result = controller.result or controller.daily_result or {}
     st.markdown(
         '<div class="approval-banner">'
         '<strong>Your approval is needed</strong>'
         '<span>StayOps never sends messages or changes operational records without you.</span>'
         '</div>',
         unsafe_allow_html=True,
+    )
+    st.caption(
+        "Simulation mode: no external message is sent. Approved changes are saved "
+        "to the local demo runtime and reflected in these screens."
     )
     actions = request.get("proposed_actions", [])
     if not actions:
@@ -979,7 +1129,13 @@ def _render_review(controller: DashboardController) -> None:
                 width="stretch",
                 key=f"approve_{controller.thread_id}_{action_id}",
             ):
-                _resume_review(controller, "approve", action_id)
+                progress_message = (
+                    "Approving and sending the simulated message…"
+                    if tool_name in {"send_guest_message", "send_cleaner_message"}
+                    else "Approving and updating the simulated record…"
+                )
+                with st.spinner(progress_message):
+                    _resume_review(controller, "approve", action_id)
                 st.rerun()
             if reject_col.button(
                 "Reject",
@@ -996,6 +1152,22 @@ def _last_run_copy(controller: DashboardController) -> str:
         return "StayOps has not run yet."
     if incomplete_analysis_message(result):
         return "StayOps could not check every required source. Review the incomplete analysis."
+    if controller.pending_review is not None and result.get("human_decision"):
+        completed_count = len(result.get("executed_actions", []))
+        remaining_count = len(
+            controller.pending_review.get("proposed_actions", [])
+        )
+        completed_copy = (
+            f"{completed_count} approved action completed"
+            if completed_count == 1
+            else f"{completed_count} approved actions completed"
+        )
+        remaining_copy = (
+            "1 action still needs review"
+            if remaining_count == 1
+            else f"{remaining_count} actions still need review"
+        )
+        return f"{completed_copy} · {remaining_copy}."
     decision = result.get("human_decision") or {}
     if decision.get("decision") == "reject":
         return "Action rejected — nothing was sent."
@@ -1118,6 +1290,7 @@ def main() -> None:
         initial_sidebar_state="expanded",
     )
     _install_theme()
+    requested_view = _requested_view()
     controller = _controller()
     daily_result = controller.daily_result or {}
     summaries = build_property_summaries(daily_result)
@@ -1136,35 +1309,11 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        '<div class="status-grid">'
-        f'<div class="status-card coral"><div class="value">{counts[PropertyHealth.NEEDS_ATTENTION]}</div><div class="label">Needs Action</div></div>'
-        f'<div class="status-card amber"><div class="value">{counts[PropertyHealth.WATCH]}</div><div class="label">Watch</div></div>'
-        f'<div class="status-card mint"><div class="value">{counts[PropertyHealth.READY]}</div><div class="label">Ready for Guests</div></div>'
-        f'<div class="status-card blue"><div class="value">{_arrivals_today(daily_result)}</div><div class="label">Arrivals Today</div></div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    daily_warning = incomplete_analysis_message(daily_result)
-    if daily_warning:
-        st.error(daily_warning, icon="⚠️")
-
+    property_names = {summary.name: summary for summary in summaries}
     with st.sidebar:
         st.markdown('<div class="sidebar-brand">STAYOPS AI</div>', unsafe_allow_html=True)
-        st.markdown(
-            '<nav class="sidebar-nav">'
-            '<a href="#command-center">Command Center</a>'
-            '<a href="#portfolio">Properties</a>'
-            '<a href="#operations-workspace">Guest Messages</a>'
-            '<a href="#operations-workspace">Turnovers</a>'
-            '<a href="#operations-workspace">Maintenance</a>'
-            '<a href="#approval-center">Approvals</a>'
-            '</nav>',
-            unsafe_allow_html=True,
-        )
+        _render_sidebar_navigation(requested_view)
         st.markdown("---")
-        property_names = {summary.name: summary for summary in summaries}
         selected_name = st.selectbox(
             "Property drill-down",
             ["All properties", *property_names],
@@ -1178,32 +1327,63 @@ def main() -> None:
         st.markdown("---")
         st.caption("Synthetic operations data · simulated writes only")
 
-    _render_attention(daily_result)
-    _render_ask_stayops(controller)
+    if requested_view == "command_center":
+        st.markdown(
+            '<div class="status-grid">'
+            f'<div class="status-card coral"><div class="value">{counts[PropertyHealth.NEEDS_ATTENTION]}</div><div class="label">Needs Action</div></div>'
+            f'<div class="status-card amber"><div class="value">{counts[PropertyHealth.WATCH]}</div><div class="label">Watch</div></div>'
+            f'<div class="status-card mint"><div class="value">{counts[PropertyHealth.READY]}</div><div class="label">Ready for Guests</div></div>'
+            f'<div class="status-card blue"><div class="value">{_arrivals_today(daily_result)}</div><div class="label">Arrivals Today</div></div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    daily_warning = incomplete_analysis_message(daily_result)
+    if daily_warning:
+        st.error(daily_warning, icon="⚠️")
+
+    if requested_view == "command_center":
+        _render_attention(daily_result)
+        _render_ask_stayops(controller)
 
     selected_summary = property_names.get(selected_name)
-    if selected_summary is None:
-        _section_heading(
-            "portfolio",
-            "Portfolio Overview",
-            "Scan readiness, arrivals, departures, and active property work.",
-        )
-        status_filter = st.radio(
-            "Portfolio status",
-            ["All", "Needs Action", "Watch", "Ready for Guests"],
-            horizontal=True,
-            label_visibility="collapsed",
-            key="portfolio_filter",
-        )
-        _render_portfolio_cards(summaries, daily_result, status_filter)
-        selected_property_id = None
-    else:
-        st.markdown('<div id="portfolio"></div>', unsafe_allow_html=True)
-        _render_property_drilldown(daily_result, selected_summary)
-        selected_property_id = selected_summary.property_id
+    selected_property_id = (
+        selected_summary.property_id if selected_summary is not None else None
+    )
+    if requested_view in {"command_center", "properties"}:
+        if selected_summary is None:
+            _section_heading(
+                "portfolio",
+                "Portfolio Overview",
+                "Scan readiness, arrivals, departures, and active property work.",
+            )
+            status_filter = st.radio(
+                "Portfolio status",
+                ["All", "Needs Action", "Watch", "Ready for Guests"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key="portfolio_filter",
+            )
+            _render_portfolio_cards(summaries, daily_result, status_filter)
+        else:
+            st.markdown('<div id="portfolio"></div>', unsafe_allow_html=True)
+            _render_property_drilldown(daily_result, selected_summary)
 
-    _render_operations_views(daily_result, selected_property_id)
-    _render_review(controller)
+    if requested_view == "command_center":
+        _render_operations_views(
+            daily_result,
+            selected_property_id,
+            requested_view,
+        )
+        _render_review(controller)
+    elif requested_view in OPERATIONS_VIEW_TO_TAB:
+        _render_operations_views(
+            daily_result,
+            selected_property_id,
+            requested_view,
+        )
+    elif requested_view == "approvals":
+        _render_review(controller)
 
     if activity_mode and controller.result is not None:
         _render_agent_activity(controller.result)

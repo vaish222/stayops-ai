@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
 from datetime import date
 from json import JSONDecodeError
 from pathlib import Path
@@ -28,6 +28,7 @@ from src.tools.contracts import (
     ToolMetadata,
 )
 from src.tools.failures import FailureSimulator
+from src.tools.runtime_store import SimulatedOperationsStore
 
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
@@ -205,6 +206,7 @@ def _read_and_filter(
     predicate: Callable[[RecordT], bool],
     data_dir: str | Path,
     failure_simulator: FailureSimulator | None,
+    overlay: Callable[[Sequence[RecordT]], list[RecordT]] | None = None,
 ) -> ReadResult[RecordT]:
     if failure_simulator is not None:
         simulated_error = failure_simulator.check(tool_name)
@@ -214,6 +216,21 @@ def _read_and_filter(
     records, load_error = _load_records(data_dir, filename, model, tool_name)
     if load_error is not None:
         return _failure_result(tool_name, filters, load_error)
+    if overlay is not None:
+        try:
+            records = overlay(records)
+        except (KeyError, RuntimeError, ValidationError, ValueError) as exc:
+            return _failure_result(
+                tool_name,
+                filters,
+                ToolError(
+                    code=ToolErrorCode.DATA_UNAVAILABLE,
+                    message=f"Simulated runtime data is unavailable for {tool_name.value}.",
+                    tool_name=tool_name,
+                    retryable=True,
+                    details={"reason": str(exc)},
+                ),
+            )
     return _success_result(tool_name, filters, [item for item in records if predicate(item)])
 
 
@@ -322,6 +339,7 @@ def get_guest_messages(
     *,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
 ) -> ReadResult[GuestMessage]:
     """Return messages received or sent on local calendar dates in the range."""
 
@@ -343,6 +361,7 @@ def get_guest_messages(
         ),
         data_dir=data_dir,
         failure_simulator=failure_simulator,
+        overlay=runtime_store.apply_guest_messages if runtime_store else None,
     )
 
 
@@ -353,6 +372,7 @@ def get_cleaning_schedule(
     *,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
 ) -> ReadResult[CleaningSchedule]:
     """Return cleaning jobs scheduled within the inclusive date range."""
 
@@ -374,6 +394,7 @@ def get_cleaning_schedule(
         ),
         data_dir=data_dir,
         failure_simulator=failure_simulator,
+        overlay=runtime_store.apply_cleanings if runtime_store else None,
     )
 
 
@@ -384,6 +405,7 @@ def get_maintenance_tickets(
     *,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
 ) -> ReadResult[MaintenanceTicket]:
     """Return tickets active at any point in the inclusive date range.
 
@@ -419,4 +441,5 @@ def get_maintenance_tickets(
         predicate=matches,
         data_dir=data_dir,
         failure_simulator=failure_simulator,
+        overlay=runtime_store.apply_maintenance if runtime_store else None,
     )

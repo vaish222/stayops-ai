@@ -22,7 +22,7 @@ from src.models import (
     SpecialistName,
 )
 from src.safety import RiskActionGate
-from src.tools import FailureSimulator
+from src.tools import FailureSimulator, SimulatedOperationsStore
 from src.tools.read_tools import DEFAULT_DATA_DIR
 
 
@@ -88,6 +88,7 @@ def _create_phase_6_graph_builder(
     reference_date: date | None = None,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
     gate_runner: GateRunner | None = None,
@@ -100,6 +101,7 @@ def _create_phase_6_graph_builder(
         reference_date=reference_date,
         data_dir=data_dir,
         failure_simulator=failure_simulator,
+        runtime_store=runtime_store,
         specialist_runners=specialist_runners,
         synthesis_runner=synthesis_runner,
     )
@@ -118,6 +120,7 @@ def build_phase_6_graph(
     reference_date: date | None = None,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
     gate_runner: GateRunner | None = None,
@@ -129,6 +132,7 @@ def build_phase_6_graph(
         reference_date=reference_date,
         data_dir=data_dir,
         failure_simulator=failure_simulator,
+        runtime_store=runtime_store,
         specialist_runners=specialist_runners,
         synthesis_runner=synthesis_runner,
         gate_runner=gate_runner,

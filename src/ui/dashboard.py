@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, time, timezone
 from enum import StrEnum
 from typing import Any
 from uuid import uuid4
@@ -12,6 +12,7 @@ from uuid import uuid4
 from langgraph.types import Command
 
 from src.graph import build_phase_8_graph, create_initial_state
+from src.tools import SimulatedOperationsStore
 
 
 OPERATING_DATE = date(2026, 8, 28)
@@ -157,11 +158,22 @@ class DashboardController:
         graph: Any | None = None,
         reference_date: date = OPERATING_DATE,
         thread_id_factory: Callable[[], str] | None = None,
+        runtime_store: SimulatedOperationsStore | None = None,
     ) -> None:
+        self.runtime_store = runtime_store or SimulatedOperationsStore(
+            clock=lambda: datetime.combine(
+                reference_date,
+                time(hour=23, minute=59),
+                tzinfo=timezone.utc,
+            )
+        )
         self.graph = (
             graph
             if graph is not None
-            else build_phase_8_graph(reference_date=reference_date)
+            else build_phase_8_graph(
+                reference_date=reference_date,
+                runtime_store=self.runtime_store,
+            )
         )
         self._thread_id_factory = thread_id_factory or (
             lambda: f"stayops-ui-{uuid4()}"

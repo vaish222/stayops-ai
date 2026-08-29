@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timezone
 
 import pytest
 from langgraph.types import Command
 
 from src.graph import build_phase_8_graph, create_initial_state
 from src.models import WriteToolName
-from src.tools import FailureSimulator, ReadToolName, SimulatedFailureConfig
+from src.tools import (
+    FailureSimulator,
+    ReadToolName,
+    SimulatedFailureConfig,
+    SimulatedOperationsStore,
+)
 
 
 REFERENCE_DATE = date(2026, 8, 28)
@@ -48,8 +53,20 @@ def test_approved_action_executes_only_its_matching_simulated_tool(
     query: str,
     tool_name: WriteToolName,
     target_record_id: str,
+    tmp_path,
 ) -> None:
-    graph = build_phase_8_graph(reference_date=REFERENCE_DATE)
+    runtime_store = SimulatedOperationsStore(
+        tmp_path,
+        clock=lambda: datetime.combine(
+            REFERENCE_DATE,
+            time(hour=23, minute=59),
+            tzinfo=timezone.utc,
+        ),
+    )
+    graph = build_phase_8_graph(
+        reference_date=REFERENCE_DATE,
+        runtime_store=runtime_store,
+    )
     thread_id = f"phase-8-{tool_name.value}"
     config, paused, request = start_review(
         graph,
@@ -81,8 +98,13 @@ def test_approved_action_executes_only_its_matching_simulated_tool(
     assert completed["executed_actions"][0]["tool_name"] == tool_name
     assert completed["executed_actions"][0]["target_record_id"] == target_record_id
     assert completed["executed_actions"][0]["simulated"] is True
-    assert completed["response_generated"] is True
-    assert "1 simulated action executed" in completed["final_response"]
+    remaining_count = len(request["proposed_actions"]) - 1
+    assert len(completed["proposed_actions"]) == remaining_count
+    assert ("__interrupt__" in completed) is (remaining_count > 0)
+    assert completed["response_generated"] is (remaining_count == 0)
+    assert runtime_store.action_history()[0]["execution_id"] == (
+        completed["executed_actions"][0]["execution_id"]
+    )
 
 
 def test_rejected_action_produces_no_token_attempt_or_execution() -> None:
@@ -103,8 +125,9 @@ def test_rejected_action_produces_no_token_attempt_or_execution() -> None:
     assert completed["approval_grants"] == []
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []
-    assert completed["response_generated"] is True
-    assert "rejected" in completed["final_response"].lower()
+    assert "__interrupt__" in completed
+    assert len(completed["proposed_actions"]) == len(request["proposed_actions"]) - 1
+    assert completed["response_generated"] is False
 
 
 def test_approving_non_executable_review_records_no_write_attempt() -> None:
@@ -132,7 +155,9 @@ def test_approving_non_executable_review_records_no_write_attempt() -> None:
     assert completed["approval_grants"] == []
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []
-    assert completed["response_generated"] is True
+    assert "__interrupt__" in completed
+    assert len(completed["proposed_actions"]) == len(request["proposed_actions"]) - 1
+    assert completed["response_generated"] is False
 
 
 def test_edited_message_requires_reconfirmation_and_executes_exact_edit() -> None:

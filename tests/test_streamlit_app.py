@@ -2,20 +2,41 @@
 
 from __future__ import annotations
 
+from datetime import datetime, time, timezone
 from pathlib import Path
+from tempfile import mkdtemp
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from src.graph import build_phase_8_graph
-from src.tools import FailureSimulator, ReadToolName, SimulatedFailureConfig
+from src.tools import (
+    FailureSimulator,
+    ReadToolName,
+    SimulatedFailureConfig,
+    SimulatedOperationsStore,
+)
 from src.ui import DashboardController, OPERATING_DATE
 
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
 
-def render_app() -> AppTest:
-    return AppTest.from_file(APP_PATH, default_timeout=10).run()
+def render_app(view: str | None = None) -> AppTest:
+    runtime_store = SimulatedOperationsStore(
+        Path(mkdtemp(prefix="stayops-ui-test-")),
+        clock=lambda: datetime.combine(
+            OPERATING_DATE,
+            time(hour=23, minute=59),
+            tzinfo=timezone.utc,
+        ),
+    )
+    controller = DashboardController(runtime_store=runtime_store)
+    app = AppTest.from_file(APP_PATH, default_timeout=10)
+    app.session_state["stayops_controller"] = controller
+    if view is not None:
+        app.query_params["view"] = view
+    return app.run()
 
 
 class FailureOnlyDashboardController(DashboardController):
@@ -32,12 +53,17 @@ def render_failure_app() -> AppTest:
             failures_before_success={ReadToolName.GET_GUEST_MESSAGES: 2}
         )
     )
+    runtime_store = SimulatedOperationsStore(
+        Path(mkdtemp(prefix="stayops-ui-failure-test-"))
+    )
     controller = FailureOnlyDashboardController(
         graph=build_phase_8_graph(
             reference_date=OPERATING_DATE,
             failure_simulator=simulator,
+            runtime_store=runtime_store,
         ),
         thread_id_factory=lambda: "dashboard-source-unavailable",
+        runtime_store=runtime_store,
     )
     app = AppTest.from_file(APP_PATH, default_timeout=10)
     app.session_state["stayops_controller"] = controller
@@ -92,7 +118,7 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     assert page_markup.count("Your approval is needed") == 1
     assert "Why your approval is required" in page_markup
     assert any(
-        "This action will send a message to the cleaner." in item.value
+        "This action will simulate sending a message to the cleaner." in item.value
         for item in app.caption
     )
     assert "Edit" not in {button.label for button in app.button}
@@ -137,6 +163,11 @@ def test_property_selector_opens_operational_drilldown() -> None:
     assert any(
         "Alex Meadow" in item.value for item in [*app.markdown, *app.text]
     )
+    visible_property_copy = "\n".join(
+        item.value for item in [*app.markdown, *app.text]
+    )
+    assert "Assigned cleaner: Alex Meadow" in visible_property_copy
+    assert "Confirmation pending" in visible_property_copy
     assert any("Cleaner-ready buffer 120 minutes" in item.value for item in app.markdown)
 
 
@@ -151,6 +182,71 @@ def test_dashboard_exposes_dedicated_operations_views() -> None:
         "Maintenance",
         "Arrivals",
     ]
+
+
+@pytest.mark.parametrize(
+    ("view", "tab_label"),
+    [
+        ("guest_messages", "Guest Messages"),
+        ("turnovers", "Turnovers"),
+        ("maintenance", "Maintenance"),
+    ],
+)
+def test_sidebar_operations_links_open_the_requested_tab(
+    view: str,
+    tab_label: str,
+) -> None:
+    app = render_app(view)
+
+    assert app.exception == []
+    assert app.session_state["operations_tab"] == tab_label
+    assert app.radio(key="sidebar_navigation").value == tab_label
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Operations Workspace" in page_markup
+    assert "Portfolio Overview" not in page_markup
+
+
+def test_sidebar_navigation_click_updates_url_and_active_page() -> None:
+    app = render_app()
+    navigation = app.radio(key="sidebar_navigation")
+    assert navigation.options == [
+        "Command Center",
+        "Properties",
+        "Guest Messages",
+        "Turnovers",
+        "Maintenance",
+        "Approvals",
+    ]
+
+    app = navigation.set_value("Turnovers").run()
+
+    assert app.exception == []
+    assert app.query_params["view"] in ("turnovers", ["turnovers"])
+    assert app.radio(key="sidebar_navigation").value == "Turnovers"
+    assert app.session_state["operations_tab"] == "Turnovers"
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Operations Workspace" in page_markup
+    assert "Portfolio Overview" not in page_markup
+
+
+@pytest.mark.parametrize(
+    ("view", "label", "heading"),
+    [
+        ("command_center", "Command Center", "Portfolio Overview"),
+        ("properties", "Properties", "Portfolio Overview"),
+        ("approvals", "Approvals", "Human Approvals"),
+    ],
+)
+def test_sidebar_non_operations_destinations_render_their_page(
+    view: str,
+    label: str,
+    heading: str,
+) -> None:
+    app = render_app(view)
+
+    assert app.exception == []
+    assert app.radio(key="sidebar_navigation").value == label
+    assert heading in "\n".join(item.value for item in app.markdown)
 
 
 def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
@@ -170,6 +266,11 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
         button.label for button in app.button
     )
     assert any("StayOps checked your operations" in item.value for item in app.info)
+    assert any(
+        "No approvals are pending" in item.value for item in app.info
+    )
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert 'id="approval-center"' in page_markup
     assert all("existing operations graph" not in item.value for item in app.info)
 
 
@@ -225,6 +326,8 @@ def test_operations_tables_use_human_readable_values() -> None:
 
     assert messages[0]["Received"] == "Aug 28 · 7:10 AM"
     assert messages[0]["Needs response"] == "Yes"
+    assert cleanings[0]["Assigned cleaner"] == "Alex Meadow"
+    assert cleanings[0]["Confirmation"] == "Confirmation pending"
     assert cleanings[0]["Target complete"] == "2:00 PM"
     assert maintenance[1]["Status"] == "In Progress"
     assert maintenance[1]["Blocks check-in"] == "No"
@@ -234,6 +337,7 @@ def test_operations_tables_use_human_readable_values() -> None:
 def test_approve_executes_the_reviewed_action_without_edit_control() -> None:
     app = render_app()
     controller = app.session_state["stayops_controller"]
+    initial_action_count = len(controller.pending_review["proposed_actions"])
     reviewed_message = controller.pending_review["proposed_actions"][0]["description"]
     assert "Edit" not in {button.label for button in app.button}
     assert len(app.text_area) == 0
@@ -244,11 +348,15 @@ def test_approve_executes_the_reviewed_action_without_edit_control() -> None:
 
     assert app.exception == []
     controller = app.session_state["stayops_controller"]
-    assert controller.pending_review is None
+    assert controller.pending_review is not None
+    assert len(controller.pending_review["proposed_actions"]) == initial_action_count - 1
     assert controller.result["executed_actions"][0]["result"]["message"] == (
         reviewed_message
     )
-    assert any("1 simulated action executed" in item.value for item in app.success)
+    assert any("Approved and sent — simulation only" in item.value for item in app.success)
+    cleaning = controller.result["cleaning_context"]["clean_lake_001"]
+    assert "Simulated reminder sent" in cleaning["notes"]
+    assert len(controller.runtime_store.action_history()) == 1
 
 
 def test_reject_control_records_decision_without_execution() -> None:
@@ -260,8 +368,10 @@ def test_reject_control_records_decision_without_execution() -> None:
     controller = app.session_state["stayops_controller"]
     assert controller.result["human_decision"]["decision"] == "reject"
     assert controller.result["executed_actions"] == []
+    assert controller.pending_review is not None
+    assert any("Action rejected — nothing was sent" in item.value for item in app.info)
     page_markup = "\n".join(item.value for item in app.markdown)
-    assert "Action rejected — nothing was sent." in page_markup
+    assert "0 approved actions completed" in page_markup
     assert page_markup.count("Last StayOps run") == 1
 
 

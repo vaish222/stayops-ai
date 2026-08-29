@@ -21,12 +21,20 @@ from src.graph.response_workflow import ResponseRunner, response_generator_node
 from src.graph.state import StayOpsState, WorkflowError
 from src.graph.synthesis_workflow import SynthesisRunner
 from src.models import (
+    CleaningSchedule,
+    GuestMessage,
     HumanDecisionRecord,
+    MaintenanceTicket,
     ProposedAction,
     ReviewDecision,
     SpecialistName,
 )
-from src.tools import ApprovalAuthority, FailureSimulator, WRITE_TOOL_RUNNERS
+from src.tools import (
+    ApprovalAuthority,
+    FailureSimulator,
+    SimulatedOperationsStore,
+    WRITE_TOOL_RUNNERS,
+)
 from src.tools.read_tools import DEFAULT_DATA_DIR
 
 
@@ -34,15 +42,16 @@ def execute_approved_actions_node(
     state: StayOpsState,
     *,
     authority: ApprovalAuthority,
+    runtime_store: SimulatedOperationsStore | None = None,
 ) -> dict[str, Any]:
     """Mint exact-action capabilities and invoke only their matching write tools."""
 
     decision = HumanDecisionRecord.model_validate(state["human_decision"])
     if decision.decision != ReviewDecision.APPROVE or not decision.review_complete:
         return {
-            "approval_grants": [],
-            "action_attempts": [],
-            "executed_actions": [],
+            "approval_grants": state["approval_grants"],
+            "action_attempts": state["action_attempts"],
+            "executed_actions": state["executed_actions"],
         }
 
     grants: list[dict[str, Any]] = []
@@ -81,16 +90,78 @@ def execute_approved_actions_node(
         grants.append(grant.model_dump(mode="json"))
         attempts.append(result.attempt.model_dump(mode="json"))
         if result.execution is not None:
+            if runtime_store is not None:
+                runtime_store.record_execution(
+                    request_id=state["request_id"],
+                    action=action,
+                    execution=result.execution,
+                )
             executions.append(result.execution.model_dump(mode="json"))
 
+    reviewed_action_ids = set(decision.action_ids)
     update: dict[str, Any] = {
-        "approval_grants": grants,
-        "action_attempts": attempts,
-        "executed_actions": executions,
+        "proposed_actions": [
+            action
+            for action in state["proposed_actions"]
+            if action["action_id"] not in reviewed_action_ids
+        ],
+        "approval_grants": [*state["approval_grants"], *grants],
+        "action_attempts": [*state["action_attempts"], *attempts],
+        "executed_actions": [*state["executed_actions"], *executions],
     }
+    if runtime_store is not None and executions:
+        guest_messages = runtime_store.apply_guest_messages(
+            [
+                GuestMessage.model_validate(item)
+                for item in state["guest_message_context"].values()
+            ]
+        )
+        cleanings = runtime_store.apply_cleanings(
+            [
+                CleaningSchedule.model_validate(item)
+                for item in state["cleaning_context"].values()
+            ]
+        )
+        maintenance = runtime_store.apply_maintenance(
+            [
+                MaintenanceTicket.model_validate(item)
+                for item in state["maintenance_context"].values()
+            ]
+        )
+        update.update(
+            {
+                "guest_message_context": {
+                    item.id: item.model_dump(mode="json") for item in guest_messages
+                },
+                "cleaning_context": {
+                    item.id: item.model_dump(mode="json") for item in cleanings
+                },
+                "maintenance_context": {
+                    item.id: item.model_dump(mode="json") for item in maintenance
+                },
+            }
+        )
     if errors:
         update["errors"] = errors
     return update
+
+
+def record_rejected_action_node(state: StayOpsState) -> dict[str, Any]:
+    """Remove only the reviewed card so the remaining cards stay pending."""
+
+    decision = HumanDecisionRecord.model_validate(state["human_decision"])
+    rejected_ids = set(decision.action_ids)
+    return {
+        "proposed_actions": [
+            action
+            for action in state["proposed_actions"]
+            if action["action_id"] not in rejected_ids
+        ]
+    }
+
+
+def _route_remaining_actions(state: StayOpsState) -> str:
+    return "review" if state["proposed_actions"] else "complete"
 
 
 def build_phase_8_graph(
@@ -99,6 +170,7 @@ def build_phase_8_graph(
     reference_date: date | None = None,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
     gate_runner: GateRunner | None = None,
@@ -118,6 +190,7 @@ def build_phase_8_graph(
         reference_date=reference_date,
         data_dir=data_dir,
         failure_simulator=failure_simulator,
+        runtime_store=runtime_store,
         specialist_runners=specialist_runners,
         synthesis_runner=synthesis_runner,
         gate_runner=gate_runner,
@@ -125,12 +198,17 @@ def build_phase_8_graph(
     )
 
     def execute_node(state: StayOpsState) -> dict[str, Any]:
-        return execute_approved_actions_node(state, authority=authority)
+        return execute_approved_actions_node(
+            state,
+            authority=authority,
+            runtime_store=runtime_store,
+        )
 
     def response_node(state: StayOpsState) -> dict[str, Any]:
         return response_generator_node(state, generator=response_runner)
 
     graph_builder.add_node("execute_approved_actions", execute_node)
+    graph_builder.add_node("record_rejected_action", record_rejected_action_node)
     graph_builder.add_node("response_generator", response_node)
     graph_builder.add_conditional_edges(
         "human_review",
@@ -138,10 +216,19 @@ def build_phase_8_graph(
         {
             "reconfirm": "human_review",
             "approved": "execute_approved_actions",
-            "rejected": "response_generator",
+            "rejected": "record_rejected_action",
         },
     )
-    graph_builder.add_edge("execute_approved_actions", "response_generator")
+    graph_builder.add_conditional_edges(
+        "execute_approved_actions",
+        _route_remaining_actions,
+        {"review": "human_review", "complete": "response_generator"},
+    )
+    graph_builder.add_conditional_edges(
+        "record_rejected_action",
+        _route_remaining_actions,
+        {"review": "human_review", "complete": "response_generator"},
+    )
     graph_builder.add_edge("response_generator", END)
     configured_checkpointer = (
         checkpointer if checkpointer is not None else InMemorySaver()

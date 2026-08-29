@@ -27,7 +27,7 @@ from src.graph.parallel_workflow import (
 from src.graph.routing import request_router_node
 from src.graph.state import StayOpsState, WorkflowError
 from src.models import OperationsSynthesisOutput, SpecialistName
-from src.tools import FailureSimulator
+from src.tools import FailureSimulator, SimulatedOperationsStore
 from src.tools.read_tools import DEFAULT_DATA_DIR
 
 
@@ -122,6 +122,7 @@ def _create_phase_5_graph_builder(
     reference_date: date | None = None,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
 ) -> StateGraph:
@@ -150,6 +151,7 @@ def _create_phase_5_graph_builder(
             state,
             data_dir=data_dir,
             failure_simulator=failure_simulator,
+            runtime_store=runtime_store,
         )
 
     def route_to_specialists(state: StayOpsState) -> Sequence[str]:
@@ -206,6 +208,7 @@ def build_phase_5_graph(
     reference_date: date | None = None,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
 ):
@@ -216,6 +219,7 @@ def build_phase_5_graph(
         reference_date=reference_date,
         data_dir=data_dir,
         failure_simulator=failure_simulator,
+        runtime_store=runtime_store,
         specialist_runners=specialist_runners,
         synthesis_runner=synthesis_runner,
     )

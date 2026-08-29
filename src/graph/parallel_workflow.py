@@ -25,6 +25,7 @@ from src.tools import (
     FailureSimulator,
     ReadResult,
     ReadToolName,
+    SimulatedOperationsStore,
     get_cleaning_schedule,
     get_guest_messages,
     get_maintenance_tickets,
@@ -154,6 +155,7 @@ def load_context_node(
     *,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
 ) -> dict[str, Any]:
     """Load needed sources independently; retry retryable failures once."""
 
@@ -188,6 +190,7 @@ def load_context_node(
             end_date,
             data_dir=data_dir,
             failure_simulator=failure_simulator,
+            runtime_store=runtime_store,
         ),
         ReadToolName.GET_CLEANING_SCHEDULE: lambda: get_cleaning_schedule(
             property_ids,
@@ -195,6 +198,7 @@ def load_context_node(
             end_date,
             data_dir=data_dir,
             failure_simulator=failure_simulator,
+            runtime_store=runtime_store,
         ),
         ReadToolName.GET_MAINTENANCE_TICKETS: lambda: get_maintenance_tickets(
             property_ids,
@@ -202,6 +206,7 @@ def load_context_node(
             end_date,
             data_dir=data_dir,
             failure_simulator=failure_simulator,
+            runtime_store=runtime_store,
         ),
     }
 
@@ -344,6 +349,7 @@ def build_phase_4_graph(
     reference_date: date | None = None,
     data_dir: str | Path = DEFAULT_DATA_DIR,
     failure_simulator: FailureSimulator | None = None,
+    runtime_store: SimulatedOperationsStore | None = None,
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
 ):
     """Compile route -> context -> conditional parallel specialists -> END."""
@@ -370,6 +376,7 @@ def build_phase_4_graph(
             state,
             data_dir=data_dir,
             failure_simulator=failure_simulator,
+            runtime_store=runtime_store,
         )
 
     def route_to_specialists(state: StayOpsState) -> Sequence[str]:
