@@ -8,7 +8,7 @@ from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.graph import END
+from langgraph.graph import END, StateGraph
 from langgraph.types import interrupt
 from pydantic import ValidationError
 
@@ -87,8 +87,14 @@ def human_review_node(state: StayOpsState) -> dict[str, Any]:
 
     if response.decision == ReviewDecision.EDIT:
         selected = selected_actions[0]
+        updated_parameters = selected.parameters
+        if "message" in selected.parameters:
+            updated_parameters = {"message": response.edited_description}
         edited = selected.model_copy(
-            update={"description": response.edited_description}
+            update={
+                "description": response.edited_description,
+                "parameters": updated_parameters,
+            }
         )
         updated_actions = [
             edited if action.action_id == edited.action_id else action
@@ -123,14 +129,14 @@ def _route_after_risk_gate(state: StayOpsState) -> str:
 
 def _route_after_human_review(state: StayOpsState) -> str:
     decision = state["human_decision"] or {}
-    return (
-        "reconfirm"
-        if decision.get("decision") == ReviewDecision.EDIT
-        else "complete"
-    )
+    if decision.get("decision") == ReviewDecision.EDIT:
+        return "reconfirm"
+    if decision.get("decision") == ReviewDecision.APPROVE:
+        return "approved"
+    return "rejected"
 
 
-def build_phase_7_graph(
+def _create_phase_7_graph_builder(
     *,
     router: RequestRouter | None = None,
     reference_date: date | None = None,
@@ -139,9 +145,8 @@ def build_phase_7_graph(
     specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
     synthesis_runner: SynthesisRunner | None = None,
     gate_runner: GateRunner | None = None,
-    checkpointer: BaseCheckpointSaver | None = None,
-):
-    """Compile Phase 7 with resumable review and no action execution node."""
+) -> StateGraph:
+    """Build Phase 7 through human review, without its completion routes."""
 
     graph_builder = _create_phase_6_graph_builder(
         router=router,
@@ -158,10 +163,35 @@ def build_phase_7_graph(
         _route_after_risk_gate,
         {"review": "human_review", "complete": END},
     )
+    return graph_builder
+
+
+def build_phase_7_graph(
+    *,
+    router: RequestRouter | None = None,
+    reference_date: date | None = None,
+    data_dir: str | Path = DEFAULT_DATA_DIR,
+    failure_simulator: FailureSimulator | None = None,
+    specialist_runners: dict[SpecialistName, SpecialistRunner] | None = None,
+    synthesis_runner: SynthesisRunner | None = None,
+    gate_runner: GateRunner | None = None,
+    checkpointer: BaseCheckpointSaver | None = None,
+):
+    """Compile Phase 7 with resumable review and no action execution node."""
+
+    graph_builder = _create_phase_7_graph_builder(
+        router=router,
+        reference_date=reference_date,
+        data_dir=data_dir,
+        failure_simulator=failure_simulator,
+        specialist_runners=specialist_runners,
+        synthesis_runner=synthesis_runner,
+        gate_runner=gate_runner,
+    )
     graph_builder.add_conditional_edges(
         "human_review",
         _route_after_human_review,
-        {"reconfirm": "human_review", "complete": END},
+        {"reconfirm": "human_review", "approved": END, "rejected": END},
     )
     configured_checkpointer = (
         checkpointer if checkpointer is not None else InMemorySaver()

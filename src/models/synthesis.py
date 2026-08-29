@@ -14,6 +14,8 @@ from src.models.findings import (
     SpecialistFinding,
     SpecialistName,
 )
+from src.models.operations import MaintenanceStatus
+from src.models.write import WriteToolName
 
 
 class OverallStatus(StrEnum):
@@ -93,7 +95,42 @@ class ProposedAction(StrictModel):
     action_type: ActionType
     description: str = Field(min_length=1)
     source_finding_ids: list[str] = Field(min_length=1)
+    tool_name: WriteToolName | None = None
+    target_record_id: str | None = Field(default=None, min_length=1)
+    parameters: dict[str, str] = Field(default_factory=dict)
     executed: Literal[False] = False
+
+    @model_validator(mode="after")
+    def executable_fields_must_be_consistent(self) -> ProposedAction:
+        expected_action_types = {
+            WriteToolName.SEND_GUEST_MESSAGE: ActionType.SEND_MESSAGE,
+            WriteToolName.SEND_CLEANER_MESSAGE: ActionType.SEND_MESSAGE,
+            WriteToolName.UPDATE_MAINTENANCE_STATUS: ActionType.UPDATE_RECORD,
+        }
+        if self.tool_name is None:
+            if self.target_record_id is not None or self.parameters:
+                raise ValueError("non-executable actions cannot include tool fields")
+            if self.action_type in {ActionType.SEND_MESSAGE, ActionType.UPDATE_RECORD}:
+                raise ValueError("write actions must specify an executable tool")
+            return self
+        if self.target_record_id is None:
+            raise ValueError("executable actions must specify target_record_id")
+        if self.action_type != expected_action_types[self.tool_name]:
+            raise ValueError("action_type does not match the selected write tool")
+        if self.tool_name in {
+            WriteToolName.SEND_GUEST_MESSAGE,
+            WriteToolName.SEND_CLEANER_MESSAGE,
+        }:
+            if self.parameters != {"message": self.description}:
+                raise ValueError("message tools must execute the reviewed description")
+        else:
+            if set(self.parameters) != {"status"}:
+                raise ValueError("maintenance updates require exactly one status")
+            try:
+                MaintenanceStatus(self.parameters["status"])
+            except ValueError as exc:
+                raise ValueError("maintenance update status is invalid") from exc
+        return self
 
 
 class OperationsSynthesisOutput(StrictModel):

@@ -136,6 +136,32 @@ for reconfirmation. Invalid responses remain interrupted with a validation
 message. Phase 7 records decisions but contains no write tools or action
 execution nodes; those remain reserved for Phase 8.
 
+## Phase 8: approval-protected simulated writes
+
+`build_phase_8_graph()` extends the checkpointed review workflow with three
+simulated write tools:
+
+- `send_guest_message()` replies to an evidence-linked guest message;
+- `send_cleaner_message()` contacts the cleaner for an evidence-linked job;
+- `update_maintenance_status()` records the exact reviewed status change.
+
+Each executable proposal includes its tool, target record, and exact parameters
+in the human-review payload. After an Approve decision, the workflow issues a
+one-time capability bound to the request ID, action ID, tool, target, content,
+and complete action fingerprint. Each tool independently validates and consumes
+that capability. Missing, invalid, replayed, cross-tool, cross-request, or
+content-mismatched tokens are rejected.
+
+Every tool call returns a structured attempt record, including rejected calls.
+The graph stores these in `action_attempts`, stores successful simulations in
+`executed_actions`, and retains issued capabilities in `approval_grants` for
+auditability. Reject creates no capability or write attempt. Edit updates the
+displayed proposal and executable message together, then requires
+reconfirmation before a new capability can be issued.
+
+These tools are simulations only and do not mutate the JSON fixtures or call an
+external service. Phase 8 does not add a dashboard or any Phase 9 behavior.
+
 Install and validate with:
 
 ```bash

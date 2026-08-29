@@ -23,6 +23,7 @@ class WorkflowError(TypedDict, total=False):
         "specialist_execution",
         "synthesis_execution",
         "risk_gate_execution",
+        "action_execution",
     ]
     code: str
     message: str
@@ -59,6 +60,8 @@ class StayOpsState(TypedDict):
     review_reasons: list[dict[str, Any]]
     risk_gate_evaluated: bool
     human_decision: dict[str, Any] | None
+    approval_grants: list[dict[str, Any]]
+    action_attempts: list[dict[str, Any]]
     executed_actions: list[dict[str, Any]]
     agent_runs: Annotated[list[AgentRunLog], operator.add]
     errors: Annotated[list[WorkflowError], operator.add]
@@ -94,6 +97,8 @@ def create_initial_state(host_query: str, request_id: str | None = None) -> Stay
         review_reasons=[],
         risk_gate_evaluated=False,
         human_decision=None,
+        approval_grants=[],
+        action_attempts=[],
         executed_actions=[],
         agent_runs=[],
         errors=[],

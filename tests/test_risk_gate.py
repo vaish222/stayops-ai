@@ -19,6 +19,7 @@ from src.models import (
     RiskGateInput,
     SpecialistFinding,
     SpecialistName,
+    WriteToolName,
 )
 from src.safety import RiskActionGate
 
@@ -57,12 +58,27 @@ def make_finding(
 
 
 def make_action(action_type: ActionType) -> ProposedAction:
+    description = f"Perform {action_type.value}."
+    executable_fields = {}
+    if action_type == ActionType.SEND_MESSAGE:
+        executable_fields = {
+            "tool_name": WriteToolName.SEND_GUEST_MESSAGE,
+            "target_record_id": "msg_test_001",
+            "parameters": {"message": description},
+        }
+    elif action_type == ActionType.UPDATE_RECORD:
+        executable_fields = {
+            "tool_name": WriteToolName.UPDATE_MAINTENANCE_STATUS,
+            "target_record_id": "maint_test_001",
+            "parameters": {"status": "in_progress"},
+        }
     return ProposedAction(
         action_id=f"action:{action_type.value}:test",
         property_id="prop_city_loft",
         action_type=action_type,
-        description=f"Perform {action_type.value}.",
+        description=description,
         source_finding_ids=["booking:arrival:test"],
+        **executable_fields,
     )
 
 

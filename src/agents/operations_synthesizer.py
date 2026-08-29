@@ -19,6 +19,7 @@ from src.models import (
     PrioritizedFinding,
     ProposedAction,
     SpecialistFinding,
+    WriteToolName,
 )
 
 
@@ -72,19 +73,27 @@ class OperationsSynthesizer:
             finding.model_copy(update={"priority_rank": rank})
             for rank, finding in enumerate(candidates, start=1)
         ]
-        proposed_actions = [
-            ProposedAction(
-                action_id=f"action:{finding.source_finding_ids[0]}",
-                property_id=finding.property_id,
-                action_type=finding.proposed_action_type,
-                description=finding.recommended_next_action,
-                source_finding_ids=finding.source_finding_ids,
+        proposed_actions: list[ProposedAction] = []
+        for finding in prioritized:
+            if (
+                not finding.action_proposed
+                or finding.proposed_action_type is None
+                or finding.recommended_next_action is None
+            ):
+                continue
+            tool_name, target_record_id, parameters = self._tool_fields_for(finding)
+            proposed_actions.append(
+                ProposedAction(
+                    action_id=f"action:{finding.source_finding_ids[0]}",
+                    property_id=finding.property_id,
+                    action_type=finding.proposed_action_type,
+                    description=finding.recommended_next_action,
+                    source_finding_ids=finding.source_finding_ids,
+                    tool_name=tool_name,
+                    target_record_id=target_record_id,
+                    parameters=parameters,
+                )
             )
-            for finding in prioritized
-            if finding.action_proposed
-            and finding.proposed_action_type is not None
-            and finding.recommended_next_action is not None
-        ]
         affected_properties = sorted(
             {
                 finding.property_id
@@ -179,6 +188,12 @@ class OperationsSynthesizer:
         )
         if not requires_attention:
             recommended_action = None
+        proposed_action_type: ActionType | None = None
+        if recommended_action is not None:
+            proposed_action_type, recommended_action = self._action_spec(
+                contributors,
+                recommended_action,
+            )
         evidence: list[FindingEvidence] = []
         seen_evidence: set[tuple[str, tuple[str, ...], str]] = set()
         for finding in contributors:
@@ -200,28 +215,103 @@ class OperationsSynthesizer:
             source_finding_ids=[finding.finding_id for finding in contributors],
             evidence=evidence,
             recommended_next_action=recommended_action,
-            proposed_action_type=(
-                self._action_type_for(contributors)
-                if recommended_action is not None
-                else None
-            ),
+            proposed_action_type=proposed_action_type,
             requires_attention=requires_attention,
             action_proposed=recommended_action is not None,
             confidence=min(finding.confidence for finding in contributors),
         )
 
     @staticmethod
-    def _action_type_for(contributors: list[SpecialistFinding]) -> ActionType:
-        message_categories = {
+    def _action_spec(
+        contributors: list[SpecialistFinding],
+        fallback_description: str,
+    ) -> tuple[ActionType, str]:
+        guest_message_categories = {
             FindingCategory.UNANSWERED_MESSAGE,
             FindingCategory.EARLY_CHECK_IN_REQUEST,
             FindingCategory.GUEST_COMPLAINT,
             FindingCategory.GUEST_MAINTENANCE_REPORT,
-            FindingCategory.CLEANER_CONFIRMATION_MISSING,
         }
-        if any(finding.category in message_categories for finding in contributors):
-            return ActionType.DRAFT_MESSAGE
-        return ActionType.REVIEW
+        categories = {finding.category for finding in contributors}
+        evidence_sources = {
+            evidence.source
+            for finding in contributors
+            for evidence in finding.evidence
+        }
+        if (
+            categories & guest_message_categories
+            and EvidenceSource.GUEST_MESSAGES in evidence_sources
+        ):
+            return (
+                ActionType.SEND_MESSAGE,
+                "Thanks for your message. I am reviewing it and will follow up shortly.",
+            )
+        if (
+            FindingCategory.CLEANER_CONFIRMATION_MISSING in categories
+            and EvidenceSource.CLEANING_SCHEDULE in evidence_sources
+        ):
+            return (
+                ActionType.SEND_MESSAGE,
+                "Please confirm whether the scheduled turnover will be completed "
+                "by the target time.",
+            )
+        maintenance_categories = {
+            FindingCategory.OPEN_MAINTENANCE,
+            FindingCategory.GUEST_IMPACTING_MAINTENANCE,
+            FindingCategory.UPCOMING_STAY_MAINTENANCE_RISK,
+        }
+        if (
+            categories & maintenance_categories
+            and EvidenceSource.MAINTENANCE_TICKETS in evidence_sources
+        ):
+            return (
+                ActionType.UPDATE_RECORD,
+                "Update the maintenance ticket status to in_progress.",
+            )
+        return ActionType.REVIEW, fallback_description
+
+    @staticmethod
+    def _tool_fields_for(
+        finding: PrioritizedFinding,
+    ) -> tuple[WriteToolName | None, str | None, dict[str, str]]:
+        if finding.proposed_action_type == ActionType.SEND_MESSAGE:
+            if FindingCategory.CLEANER_CONFIRMATION_MISSING in finding.categories:
+                tool_name = WriteToolName.SEND_CLEANER_MESSAGE
+                source = EvidenceSource.CLEANING_SCHEDULE
+            else:
+                tool_name = WriteToolName.SEND_GUEST_MESSAGE
+                source = EvidenceSource.GUEST_MESSAGES
+            target_record_id = OperationsSynthesizer._first_evidence_id(
+                finding,
+                source,
+            )
+            return (
+                tool_name,
+                target_record_id,
+                {"message": finding.recommended_next_action or ""},
+            )
+        if finding.proposed_action_type == ActionType.UPDATE_RECORD:
+            return (
+                WriteToolName.UPDATE_MAINTENANCE_STATUS,
+                OperationsSynthesizer._first_evidence_id(
+                    finding,
+                    EvidenceSource.MAINTENANCE_TICKETS,
+                ),
+                {"status": "in_progress"},
+            )
+        return None, None, {}
+
+    @staticmethod
+    def _first_evidence_id(
+        finding: PrioritizedFinding,
+        source: EvidenceSource,
+    ) -> str:
+        return next(
+            record_id
+            for evidence in finding.evidence
+            if evidence.source == source
+            for record_id in evidence.record_ids
+        )
 
     @staticmethod
     def _evidence_ids(
