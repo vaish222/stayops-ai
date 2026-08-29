@@ -1,4 +1,4 @@
-"""Headless Streamlit interaction tests for the Phase 9 dashboard."""
+"""Headless Streamlit interaction tests for the StayOps command center."""
 
 from __future__ import annotations
 
@@ -48,12 +48,15 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     app = render_app()
 
     assert app.exception == []
-    assert any("STAYOPS AI" in item.value for item in app.markdown)
-    assert [(metric.label, metric.value) for metric in app.metric[:3]] == [
-        ("Need attention", "2"),
-        ("Watch", "3"),
-        ("Ready", "3"),
-    ]
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "8 properties. One operations command center." in page_markup
+    assert "Know what's ready, what's at risk, and what needs your approval." in page_markup
+    assert all(
+        label in page_markup
+        for label in ("Needs Action", "Watch", "Ready for Guests", "Arrivals Today")
+    )
+    assert "Needs Your Attention" in page_markup
+    assert page_markup.index("Needs Your Attention") < page_markup.index("Ask StayOps")
     property_selector = app.selectbox(key="property_drilldown")
     assert property_selector.options == [
         "All properties",
@@ -67,10 +70,34 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
         "Sunset House",
     ]
     assert {button.label for button in app.button} >= {
-        "Analyze",
-        "Approve",
-        "Edit & reconfirm",
+        "Ask StayOps",
+        "Approve & Send",
+        "Edit",
         "Reject",
+        "What's urgent today?",
+        "Who's checking in?",
+        "Cleaning risks",
+        "Guests needing replies",
+    }
+    assert page_markup.count("Your approval is needed") == 1
+    assert len(app.text_area) == 6
+
+
+def test_portfolio_filter_and_view_property_are_interactive() -> None:
+    app = render_app()
+
+    app = app.radio(key="portfolio_filter").set_value("Ready for Guests").run()
+    assert app.exception == []
+    assert len([button for button in app.button if button.label == "View property"]) == 3
+
+    app = next(
+        button for button in app.button if button.label == "View property"
+    ).click().run()
+    assert app.exception == []
+    assert app.selectbox(key="property_drilldown").value in {
+        "Downtown Suite",
+        "Garden Cottage",
+        "Sunset House",
     }
 
 
@@ -80,16 +107,16 @@ def test_property_selector_opens_operational_drilldown() -> None:
     app = app.selectbox(key="property_drilldown").select("Lake House").run()
 
     assert app.exception == []
-    assert "Lake House" in [subheader.value for subheader in app.subheader]
+    assert any("Lake House" in item.value for item in app.markdown)
     assert [tab.label for tab in app.tabs] == [
         "Overview",
         "Stays",
-        "Operations",
-        "Priorities",
-        "Messages",
-        "Cleanings",
+        "Property Ops",
+        "Needs Your Attention",
+        "Guest Messages",
+        "Turnovers",
         "Maintenance",
-        "Upcoming arrivals",
+        "Arrivals",
     ]
     assert any(
         "Alex Meadow" in item.value for item in [*app.markdown, *app.text]
@@ -102,11 +129,11 @@ def test_dashboard_exposes_dedicated_operations_views() -> None:
 
     assert app.exception == []
     assert [tab.label for tab in app.tabs] == [
-        "Priorities",
-        "Messages",
-        "Cleanings",
+        "Needs Your Attention",
+        "Guest Messages",
+        "Turnovers",
         "Maintenance",
-        "Upcoming arrivals",
+        "Arrivals",
     ]
 
 
@@ -115,29 +142,43 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     query = "Which guests are arriving at City Loft today?"
     app.text_input[0].input(query)
 
-    app = next(button for button in app.button if button.label == "Analyze").click().run()
+    app = next(
+        button for button in app.button if button.label == "Ask StayOps"
+    ).click().run()
 
     assert app.exception == []
     controller = app.session_state["stayops_controller"]
     assert controller.last_query == query
     assert controller.pending_review is None
-    assert not {"Approve", "Edit & reconfirm", "Reject"}.intersection(
+    assert not {"Approve & Send", "Approve & Update", "Edit", "Reject"}.intersection(
         button.label for button in app.button
     )
     assert any("existing operations graph" in item.value for item in app.info)
 
 
-def test_debug_toggle_exposes_specialist_findings() -> None:
+def test_agent_activity_toggle_exposes_specialist_findings() -> None:
     app = render_app()
 
     app = app.toggle[0].set_value(True).run()
 
     assert app.exception == []
-    assert "Specialist findings · debug" in [
-        subheader.value for subheader in app.subheader
-    ]
+    assert any("Agent Activity" in item.value for item in app.markdown)
+    assert any("Request Router" in item.value for item in app.markdown)
+    assert any("Operations Synthesizer" in item.value for item in app.markdown)
+    assert any("Safety Gate" in item.value for item in app.markdown)
+    assert any("succeeded" in item.value for item in app.markdown)
     assert any("Booking" in expander.label for expander in app.expander)
     assert any("Maintenance" in expander.label for expander in app.expander)
+
+
+def test_raw_record_ids_are_not_exposed_in_operator_views() -> None:
+    app = render_app()
+
+    visible_copy = "\n".join(
+        item.value for item in [*app.markdown, *app.text, *app.caption]
+    )
+    for prefix in ("prop_", "res_", "msg_", "clean_", "maint_"):
+        assert prefix not in visible_copy
 
 
 def test_edit_reconfirm_and_approve_executes_exact_ui_revision() -> None:
@@ -145,9 +186,7 @@ def test_edit_reconfirm_and_approve_executes_exact_ui_revision() -> None:
     edited_message = "Please confirm Lake House will be ready by 1 PM."
     app.text_area[0].input(edited_message)
 
-    app = next(
-        button for button in app.button if button.label == "Edit & reconfirm"
-    ).click().run()
+    app = next(button for button in app.button if button.label == "Edit").click().run()
 
     assert app.exception == []
     controller = app.session_state["stayops_controller"]
@@ -155,7 +194,9 @@ def test_edit_reconfirm_and_approve_executes_exact_ui_revision() -> None:
     assert app.text_area[0].value == edited_message
     assert any("reconfirmation" in item.value for item in app.warning)
 
-    app = next(button for button in app.button if button.label == "Approve").click().run()
+    app = next(
+        button for button in app.button if button.label == "Approve & Send"
+    ).click().run()
 
     assert app.exception == []
     controller = app.session_state["stayops_controller"]
@@ -185,11 +226,10 @@ def test_source_failure_is_prominent_and_requires_acknowledgement() -> None:
     assert any("Analysis incomplete" in item.value for item in app.error)
     assert any("findings are partial" in item.value.lower() for item in app.error)
     assert "Acknowledge" in {button.label for button in app.button}
-    assert [(metric.label, metric.value) for metric in app.metric[:3]] == [
-        ("Need attention", "0"),
-        ("Watch", "8"),
-        ("Ready", "0"),
-    ]
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert '<div class="value">0</div><div class="label">Needs Action</div>' in page_markup
+    assert '<div class="value">8</div><div class="label">Watch</div>' in page_markup
+    assert '<div class="value">0</div><div class="label">Ready for Guests</div>' in page_markup
 
     app = next(
         button for button in app.button if button.label == "Acknowledge"
