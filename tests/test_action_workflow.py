@@ -226,7 +226,7 @@ def test_safe_read_path_never_reaches_write_execution() -> None:
     assert completed["action_attempts"] == []
     assert completed["executed_actions"] == []
     assert completed["response_generated"] is True
-    assert "No human approval was required" in completed["final_response"]
+    assert completed["final_response"].startswith("1 arrival is scheduled on Aug 28.")
 
 
 def test_source_failure_review_can_be_acknowledged_without_a_write() -> None:

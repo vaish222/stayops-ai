@@ -89,9 +89,9 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     assert len(attention_cards) == 2
     assert all("needs_attention" in card and "watch" not in card for card in attention_cards)
     assert "2 properties require action · 3 more properties are on watch" in page_markup
-    assert "Last StayOps run" in page_markup
-    assert page_markup.count("Last StayOps run") == 1
-    assert page_markup.index("Ask StayOps") < page_markup.index("Last StayOps run")
+    assert "✨ StayOps Answer" in page_markup
+    assert page_markup.count("✨ StayOps Answer") == 1
+    assert page_markup.index("Ask StayOps") < page_markup.index("✨ StayOps Answer")
     assert "None in scope" not in page_markup
     assert "Prioritized issues" not in page_markup
     property_selector = app.selectbox(key="property_drilldown")
@@ -265,12 +265,14 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     assert not {"Approve & Send", "Approve & Update", "Reject"}.intersection(
         button.label for button in app.button
     )
-    assert any("StayOps checked your operations" in item.value for item in app.info)
+    assert all("StayOps checked your operations" not in item.value for item in app.info)
     assert any(
         "No approvals are pending" in item.value for item in app.info
     )
     page_markup = "\n".join(item.value for item in app.markdown)
     assert 'id="approval-center"' in page_markup
+    assert "1 arrival is scheduled on Aug 28." in page_markup
+    assert "Taylor Moon, 3:00 PM, 2 guests" in page_markup
     assert all("existing operations graph" not in item.value for item in app.info)
 
 
@@ -371,8 +373,8 @@ def test_reject_control_records_decision_without_execution() -> None:
     assert controller.pending_review is not None
     assert any("Action rejected — nothing was sent" in item.value for item in app.info)
     page_markup = "\n".join(item.value for item in app.markdown)
-    assert "0 approved actions completed" in page_markup
-    assert page_markup.count("Last StayOps run") == 1
+    assert "Needs Action items require attention" in page_markup
+    assert page_markup.count("✨ StayOps Answer") == 1
 
 
 def test_source_failure_is_prominent_and_requires_acknowledgement() -> None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.models.human_review import HumanDecisionRecord
@@ -21,6 +23,19 @@ class ResponseGenerationInput(StrictModel):
     action_attempts: list[WriteAttempt]
     executed_actions: list[ExecutedAction]
     action_execution_errors: list[str] = Field(default_factory=list)
+    host_query: str = ""
+    intent: str = ""
+    property_scope: list[str] = Field(default_factory=list)
+    date_scope: str | None = None
+    property_context: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    reservation_context: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    guest_message_context: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    cleaning_context: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    maintenance_context: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    operational_findings: list[dict[str, Any]] = Field(default_factory=list)
+    proposed_actions: list[dict[str, Any]] = Field(default_factory=list)
+    analysis_complete: bool = True
+    unavailable_sources: list[str] = Field(default_factory=list)
 
 
 class ResponseGenerationOutput(StrictModel):

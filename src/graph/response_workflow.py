@@ -32,6 +32,19 @@ def response_generator_node(
             for error in state["errors"]
             if error.get("stage") == "action_execution"
         ],
+        "host_query": state["host_query"],
+        "intent": state["intent"],
+        "property_scope": state["property_scope"],
+        "date_scope": state["date_scope"],
+        "property_context": state["property_context"],
+        "reservation_context": state["reservation_context"],
+        "guest_message_context": state["guest_message_context"],
+        "cleaning_context": state["cleaning_context"],
+        "maintenance_context": state["maintenance_context"],
+        "operational_findings": state["operational_findings"],
+        "proposed_actions": state["proposed_actions"],
+        "analysis_complete": state["analysis_complete"],
+        "unavailable_sources": state["unavailable_sources"],
     }
     try:
         output = runner.invoke(payload)
@@ -46,8 +59,8 @@ def response_generator_node(
         )
         return {
             "final_response": (
-                f"{state['synthesis_briefing']}\n\n"
-                "The final workflow outcome summary is unavailable."
+                "StayOps could not prepare an answer for this request. "
+                "Review the operational details before taking action."
             ),
             "response_generated": False,
             "errors": [error],

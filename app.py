@@ -8,6 +8,7 @@ from typing import Any
 
 import streamlit as st
 
+from src.agents.response_generator import format_stayops_response
 from src.ui import (
     DEFAULT_DAILY_QUERY,
     DashboardController,
@@ -142,7 +143,7 @@ def _install_theme() -> None:
         .issue-title { font-size: 1.04rem; font-weight: 750; margin: .45rem 0 .2rem; }
         .muted { color: var(--muted); font-size: .88rem; }
         .property-name { font-weight: 750; font-size: 1rem; }
-        .attention-card, .property-card, .agent-card, .approval-banner, .last-run-card {
+        .attention-card, .property-card, .agent-card, .approval-banner {
             background:var(--card); border:1px solid var(--line); border-radius:16px; padding:1rem 1.05rem;
         }
         .attention-card { border-top:4px solid #df7d70; min-height:164px; padding:.82rem .95rem; }
@@ -157,9 +158,9 @@ def _install_theme() -> None:
         .property-meta strong { display:block; color:var(--navy); font-size:.72rem; margin-bottom:.1rem; }
         .approval-banner { background:#fff7e2; border-color:#e7c46f; margin:.45rem 0 1rem; }
         .approval-banner strong { display:block; color:#6f4b0d; margin-bottom:.2rem; }
-        .last-run-card { background:#edf4f9; border-color:#d8e5ee; padding:.75rem 1rem; margin:.65rem 0 1.1rem; }
-        .last-run-card strong { display:block; color:var(--navy); margin-bottom:.18rem; }
-        .last-run-card span { color:#415967; font-size:.84rem; }
+        .st-key-stayops_answer {
+            background:#edf4f9; border-color:#d8e5ee; border-radius:16px;
+        }
         .agent-card { min-height:112px; }
         .agent-card strong { color:var(--navy); }
         .agent-count { font-size:1.12rem; font-weight:800; color:var(--teal-dark); margin:.35rem 0 .2rem; }
@@ -393,10 +394,7 @@ def _run_query(controller: DashboardController, query: str) -> None:
     except ValueError as exc:
         st.session_state.stayops_notice = ("warning", str(exc))
     else:
-        st.session_state.stayops_notice = (
-            "info",
-            "StayOps checked your operations.",
-        )
+        st.session_state.pop("stayops_notice", None)
 
 
 def _resume_review(
@@ -626,7 +624,7 @@ def _render_ask_stayops(controller: DashboardController) -> None:
 
     quick_prompts = {
         "What's urgent today?": "What's urgent today?",
-        "Who's checking in?": "Which guests are checking in today?",
+        "Who's checking in?": "Which guests are arriving today?",
         "Cleaning risks": "What cleaning risks need attention today?",
         "Guests needing replies": "Which guest messages need a reply today?",
     }
@@ -637,7 +635,7 @@ def _render_ask_stayops(controller: DashboardController) -> None:
         if column.button(label, key=f"quick_prompt_{label}", width="stretch"):
             _run_query(controller, prompt)
     _show_notice()
-    _render_last_run(controller)
+    _render_stayops_answer(controller)
 
 
 def _property_card_details(
@@ -1146,60 +1144,18 @@ def _render_review(controller: DashboardController) -> None:
                 st.rerun()
 
 
-def _last_run_copy(controller: DashboardController) -> str:
+def _stayops_answer(controller: DashboardController) -> str:
     result = controller.result
     if result is None:
         return "StayOps has not run yet."
-    if incomplete_analysis_message(result):
-        return "StayOps could not check every required source. Review the incomplete analysis."
-    if controller.pending_review is not None and result.get("human_decision"):
-        completed_count = len(result.get("executed_actions", []))
-        remaining_count = len(
-            controller.pending_review.get("proposed_actions", [])
-        )
-        completed_copy = (
-            f"{completed_count} approved action completed"
-            if completed_count == 1
-            else f"{completed_count} approved actions completed"
-        )
-        remaining_copy = (
-            "1 action still needs review"
-            if remaining_count == 1
-            else f"{remaining_count} actions still need review"
-        )
-        return f"{completed_copy} · {remaining_copy}."
-    decision = result.get("human_decision") or {}
-    if decision.get("decision") == "reject":
-        return "Action rejected — nothing was sent."
-    if result.get("executed_actions"):
-        execution_count = len(result["executed_actions"])
-        noun = "action" if execution_count == 1 else "actions"
-        return f"{execution_count} approved {noun} completed."
-    findings = [
-        item
-        for item in result.get("priority_items", [])
-        if item.get("requires_attention")
-    ]
-    if not findings:
-        return "StayOps checked this request. No operational issues need attention."
-    property_name = _property_name(result, findings[0].get("property_id", ""))
-    issue_noun = "issue needs" if len(findings) == 1 else "issues need"
-    copy = f"{len(findings)} {issue_noun} attention"
-    if property_name:
-        copy += f" · {property_name}: {findings[0]['summary']}"
-    if controller.pending_review is not None:
-        copy += " · Your approval is required."
-    return copy
+    return format_stayops_response(result)
 
 
-def _render_last_run(controller: DashboardController) -> None:
-    st.markdown(
-        '<div id="last-stayops-run" class="last-run-card">'
-        '<strong>Last StayOps run</strong>'
-        f'<span>{escape(_last_run_copy(controller))}</span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
+def _render_stayops_answer(controller: DashboardController) -> None:
+    with st.container(border=True, key="stayops_answer"):
+        st.markdown('<div id="stayops-answer"></div>', unsafe_allow_html=True)
+        st.markdown("### ✨ StayOps Answer")
+        st.markdown(_stayops_answer(controller))
 
 
 def _render_agent_activity(result: dict[str, Any]) -> None:
