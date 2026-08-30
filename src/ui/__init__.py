@@ -1,6 +1,8 @@
 """Presentation helpers for the StayOps Streamlit dashboard."""
 
 from src.ui.dashboard import (
+    ActivityStatus,
+    ActivityStep,
     DEFAULT_DAILY_QUERY,
     DashboardController,
     PropertyHealth,
@@ -12,6 +14,8 @@ from src.ui.dashboard import (
 )
 
 __all__ = [
+    "ActivityStatus",
+    "ActivityStep",
     "DEFAULT_DAILY_QUERY",
     "DashboardController",
     "PropertyHealth",

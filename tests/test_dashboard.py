@@ -11,6 +11,7 @@ import pytest
 from src.models import WriteToolName
 from src.tools import SimulatedOperationsStore
 from src.ui import (
+    ActivityStatus,
     DashboardController,
     PropertyHealth,
     build_property_summaries,
@@ -156,6 +157,36 @@ def test_ask_stayops_uses_new_thread_without_replacing_daily_portfolio() -> None
     assert query_result["property_scope"] == ["prop_city_loft"]
     assert controller.daily_result is not None
     assert len(build_property_summaries(controller.daily_result)) == 8
+
+
+def test_user_query_stream_reports_live_activity_and_final_state() -> None:
+    controller = deterministic_controller()
+    activity_snapshots: list[dict[str, ActivityStatus]] = []
+
+    result = controller.run_query(
+        "Which guests are arriving at City Loft today?",
+        on_activity=lambda: activity_snapshots.append(
+            {
+                key: step.status
+                for key, step in controller.activity_steps.items()
+            }
+        ),
+    )
+
+    assert len(activity_snapshots) > 3
+    assert activity_snapshots[0]["request_router"] == ActivityStatus.RUNNING
+    assert any(
+        snapshot["booking_agent"] == ActivityStatus.RUNNING
+        for snapshot in activity_snapshots
+    )
+    assert controller.activity_steps["response_generator"].status == (
+        ActivityStatus.COMPLETED
+    )
+    assert controller.activity_steps["guest_agent"].status == (
+        ActivityStatus.NOT_NEEDED
+    )
+    assert controller.activity_running is False
+    assert result["response_generated"] is True
 
 
 def test_controller_resumes_approval_on_same_thread_and_exposes_execution() -> None:

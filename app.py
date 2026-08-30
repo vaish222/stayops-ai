@@ -11,6 +11,7 @@ import streamlit as st
 from src.agents.response_generator import format_stayops_response
 from src.time_context import current_operating_date
 from src.ui import (
+    ActivityStatus,
     DEFAULT_DAILY_QUERY,
     DashboardController,
     PropertyHealth,
@@ -167,6 +168,38 @@ def _install_theme() -> None:
         .agent-count { font-size:1.12rem; font-weight:800; color:var(--teal-dark); margin:.35rem 0 .2rem; }
         .agent-status { color:#526570; font-size:.8rem; line-height:1.35; }
         .flow-arrow { text-align:center; color:#789098; font-size:1.25rem; line-height:1; padding:.15rem; }
+        .st-key-agent_activity_panel {
+            position: sticky;
+            top: 1rem;
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+            background: #f4f8f6;
+            border: 1px solid #d3e0da;
+            border-radius: 17px;
+            padding: .9rem .85rem;
+        }
+        .activity-header { margin-bottom:.7rem; }
+        .activity-title { color:var(--navy); font-size:1rem; font-weight:820; }
+        .activity-copy { color:var(--muted); font-size:.72rem; line-height:1.35; margin-top:.16rem; }
+        .activity-ready {
+            background:var(--card); border:1px dashed #b9cec5; border-radius:12px;
+            color:#526570; font-size:.78rem; line-height:1.45; padding:.75rem;
+        }
+        .activity-row { display:grid; grid-template-columns:16px 1fr; gap:.48rem; position:relative; padding:0 0 .72rem; }
+        .activity-row:not(:last-child)::after {
+            content:""; position:absolute; left:6px; top:15px; bottom:0; width:1px; background:#cbd8d2;
+        }
+        .activity-dot { width:13px; height:13px; border-radius:50%; margin-top:.15rem; background:#aab6b2; border:2px solid #f4f8f6; z-index:1; }
+        .activity-dot.running { background:#16877e; animation:activity-pulse 1.2s ease-in-out infinite; }
+        .activity-dot.completed { background:#4f9a75; }
+        .activity-dot.not_needed, .activity-dot.queued { background:#aeb9b5; }
+        .activity-dot.waiting_approval { background:#d39a2f; }
+        .activity-dot.failed, .activity-dot.rejected { background:#ce6257; }
+        .activity-dot.fallback { background:#b4842e; }
+        .activity-label { color:var(--navy); font-size:.78rem; font-weight:760; line-height:1.2; }
+        .activity-detail { color:#61727a; font-size:.68rem; line-height:1.35; margin-top:.1rem; }
+        .activity-status { font-weight:750; }
+        @keyframes activity-pulse { 50% { opacity:.35; transform:scale(.82); } }
         .sidebar-brand { font-size:1.1rem; font-weight:850; color:var(--navy); letter-spacing:.08em; margin:.15rem 0 1rem; }
         .st-key-sidebar_navigation [role="radiogroup"] { gap:.22rem; }
         .st-key-sidebar_navigation label {
@@ -186,6 +219,7 @@ def _install_theme() -> None:
             .status-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
             .property-meta { grid-template-columns:1fr; }
             .block-container { padding-left:1rem; padding-right:1rem; }
+            .st-key-agent_activity_panel { position:static; max-height:none; overflow:visible; }
         }
         </style>
         """,
@@ -389,9 +423,17 @@ def _show_notice() -> None:
     getattr(st, level)(message)
 
 
-def _run_query(controller: DashboardController, query: str) -> None:
+def _run_query(
+    controller: DashboardController,
+    query: str,
+    activity_slot: Any | None = None,
+) -> None:
+    def refresh_activity() -> None:
+        if activity_slot is not None:
+            _render_agent_activity(controller, activity_slot)
+
     try:
-        controller.run_query(query)
+        controller.run_query(query, on_activity=refresh_activity)
     except ValueError as exc:
         st.session_state.stayops_notice = ("warning", str(exc))
     else:
@@ -403,6 +445,7 @@ def _resume_review(
     decision: str,
     action_id: str | None,
     edited_description: str | None = None,
+    activity_slot: Any | None = None,
 ) -> None:
     review = controller.pending_review or {}
     acknowledgement_only = not review.get("proposed_actions")
@@ -418,10 +461,15 @@ def _resume_review(
         {},
     )
     try:
+        def refresh_activity() -> None:
+            if activity_slot is not None:
+                _render_agent_activity(controller, activity_slot)
+
         result = controller.resume_review(
             decision,
             action_id=action_id,
             edited_description=edited_description,
+            on_activity=refresh_activity,
         )
     except (RuntimeError, ValueError) as exc:
         st.session_state.stayops_notice = ("error", str(exc))
@@ -607,7 +655,10 @@ def _render_attention(result: dict[str, Any]) -> None:
             )
 
 
-def _render_ask_stayops(controller: DashboardController) -> None:
+def _render_ask_stayops(
+    controller: DashboardController,
+    activity_slot: Any | None = None,
+) -> None:
     _section_heading(
         "ask-stayops",
         "Ask StayOps",
@@ -621,7 +672,7 @@ def _render_ask_stayops(controller: DashboardController) -> None:
         )
         submitted = st.form_submit_button("Ask StayOps", type="primary")
     if submitted:
-        _run_query(controller, query)
+        _run_query(controller, query, activity_slot)
 
     quick_prompts = {
         "What's urgent today?": "What's urgent today?",
@@ -634,7 +685,7 @@ def _render_ask_stayops(controller: DashboardController) -> None:
         prompt_columns, quick_prompts.items(), strict=True
     ):
         if column.button(label, key=f"quick_prompt_{label}", width="stretch"):
-            _run_query(controller, prompt)
+            _run_query(controller, prompt, activity_slot)
     _show_notice()
     _render_stayops_answer(controller)
 
@@ -1057,7 +1108,10 @@ def _approval_explanation(action: dict[str, Any]) -> str:
     return "This operational decision requires your review before StayOps continues."
 
 
-def _render_review(controller: DashboardController) -> None:
+def _render_review(
+    controller: DashboardController,
+    activity_slot: Any | None = None,
+) -> None:
     request = controller.pending_review
     _section_heading(
         "approval-center",
@@ -1088,7 +1142,7 @@ def _render_review(controller: DashboardController) -> None:
             type="primary",
             key=f"acknowledge_{controller.thread_id}",
         ):
-            _resume_review(controller, "approve", None)
+            _resume_review(controller, "approve", None, activity_slot=activity_slot)
             st.rerun()
         return
 
@@ -1134,14 +1188,24 @@ def _render_review(controller: DashboardController) -> None:
                     else "Approving and updating the simulated record…"
                 )
                 with st.spinner(progress_message):
-                    _resume_review(controller, "approve", action_id)
+                    _resume_review(
+                        controller,
+                        "approve",
+                        action_id,
+                        activity_slot=activity_slot,
+                    )
                 st.rerun()
             if reject_col.button(
                 "Reject",
                 width="stretch",
                 key=f"reject_{controller.thread_id}_{action_id}",
             ):
-                _resume_review(controller, "reject", action_id)
+                _resume_review(
+                    controller,
+                    "reject",
+                    action_id,
+                    activity_slot=activity_slot,
+                )
                 st.rerun()
 
 
@@ -1161,102 +1225,142 @@ def _render_stayops_answer(controller: DashboardController) -> None:
         st.markdown(_stayops_answer(controller))
 
 
-def _render_agent_activity(result: dict[str, Any]) -> None:
-    _section_heading(
-        "agent-activity",
-        "Agent Activity",
-        "How StayOps routed, analyzed, synthesized, and safety-checked this run.",
-    )
-    intent = result.get("intent", "operations")
-    selected_specialists = result.get("selected_specialists", [])
-    st.markdown(
-        '<div class="agent-card">'
-        '<strong>Request Router</strong>'
-        f'<div class="agent-count">{escape(str(intent)).replace("_", " ").title()}</div>'
-        f'<div class="muted">{len(selected_specialists)} specialists selected</div>'
-        '</div><div class="flow-arrow">↓</div>',
-        unsafe_allow_html=True,
-    )
-    runs = {run.get("agent"): run for run in result.get("agent_runs", [])}
-    fields = (
-        ("Booking", "booking", "booking_findings"),
-        ("Guest", "guest", "guest_findings"),
-        ("Turnover", "turnover", "turnover_findings"),
-        ("Maintenance", "maintenance", "maintenance_findings"),
-    )
-    columns = st.columns(4)
-    for column, (label, agent_name, field) in zip(columns, fields, strict=True):
-        run = runs.get(agent_name, {})
-        findings_count = len(result.get(field, []))
-        if not run:
-            headline = "Not needed"
-            status_copy = "Not needed for this request"
-        elif run.get("status") == "failed":
-            headline = "Failed"
-            status_copy = "Failed · Review developer details"
-        else:
-            headline = "Completed"
-            finding_noun = "finding" if findings_count == 1 else "findings"
-            seconds = float(run.get("latency_ms", 0)) / 1000
-            status_copy = f"Completed · {findings_count} {finding_noun} · {seconds:.2f}s"
-        with column:
+def _render_agent_activity(
+    controller: DashboardController,
+    activity_slot: Any,
+) -> None:
+    """Refresh the compact, sticky execution timeline in one placeholder."""
+
+    status_copy = {
+        ActivityStatus.QUEUED: "Queued",
+        ActivityStatus.RUNNING: "Running",
+        ActivityStatus.COMPLETED: "Completed",
+        ActivityStatus.NOT_NEEDED: "Not needed",
+        ActivityStatus.WAITING_APPROVAL: "Waiting",
+        ActivityStatus.FAILED: "Failed",
+        ActivityStatus.FALLBACK: "Fallback",
+        ActivityStatus.REJECTED: "Rejected",
+    }
+    with activity_slot.container():
+        st.markdown(
+            '<div id="agent-activity" class="activity-header">'
+            '<div class="activity-title">Agent Activity</div>'
+            '<div class="activity-copy">Live progress for your latest request.</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        if not controller.activity_steps:
             st.markdown(
-                '<div class="agent-card">'
-                f'<strong>{label}</strong>'
-                f'<div class="agent-count">{headline}</div>'
-                f'<div class="agent-status">{escape(status_copy)}</div>'
-                '</div>',
+                '<div class="activity-ready"><strong>Ready for your question</strong><br>'
+                'Ask StayOps to watch routing, specialist analysis, safety checks, '
+                'and approvals as they happen.</div>',
                 unsafe_allow_html=True,
             )
-    review_count = len(result.get("review_reasons", []))
-    priority_count = len(result.get("priority_items", []))
-    error_count = len(result.get("errors", []))
-    synthesis_run = result.get("synthesis_run") or {}
-    st.markdown('<div class="flow-arrow">↓</div>', unsafe_allow_html=True)
-    synth_col, gate_col = st.columns(2)
-    with synth_col:
-        synthesis_status = str(synthesis_run.get("status", "completed")).replace(
-            "_", " "
-        ).title()
-        synthesis_mode = str(
-            synthesis_run.get("mode", "deterministic")
-        ).replace("_", " ").title()
-        provider = synthesis_run.get("provider")
-        model = synthesis_run.get("model")
-        model_copy = (
-            f" · {provider}/{model}" if provider and model else ""
-        )
-        latency_ms = float(synthesis_run.get("latency_ms", 0))
-        synthesis_copy = (
-            f"{synthesis_mode}{model_copy} · {synthesis_status} · "
-            f"{latency_ms:.1f}ms · {priority_count} prioritized"
-        )
+            return
+
+        rows = []
+        for step in controller.activity_steps.values():
+            status = status_copy[step.status]
+            rows.append(
+                '<div class="activity-row">'
+                f'<div class="activity-dot {step.status.value}"></div>'
+                '<div>'
+                f'<div class="activity-label">{escape(step.label)}</div>'
+                f'<div class="activity-detail"><span class="activity-status">'
+                f'{escape(status)}</span> · {escape(step.detail)}</div>'
+                '</div></div>'
+            )
+        st.markdown("".join(rows), unsafe_allow_html=True)
+
+        result = controller.result
+        if result is not None and not controller.activity_running:
+            with st.expander("Developer details", expanded=False):
+                st.json(
+                    {
+                        "booking_findings": result.get("booking_findings", []),
+                        "guest_findings": result.get("guest_findings", []),
+                        "turnover_findings": result.get("turnover_findings", []),
+                        "maintenance_findings": result.get(
+                            "maintenance_findings",
+                            [],
+                        ),
+                        "synthesis_run": result.get("synthesis_run") or {},
+                        "agent_runs": result.get("agent_runs", []),
+                        "errors": result.get("errors", []),
+                    }
+                )
+
+
+def _render_dashboard_content(
+    *,
+    controller: DashboardController,
+    requested_view: str,
+    daily_result: dict[str, Any],
+    summaries: list[Any],
+    counts: dict[PropertyHealth, int],
+    property_names: dict[str, Any],
+    selected_name: str,
+    activity_slot: Any,
+) -> None:
+    """Render the selected workspace beside the persistent activity rail."""
+
+    if requested_view == "command_center":
         st.markdown(
-            '<div class="agent-card"><strong>Operations Synthesizer</strong>'
-            f'<div class="agent-count">{escape(synthesis_status)}</div>'
-            f'<div class="muted">{escape(synthesis_copy)}</div></div>',
+            '<div class="status-grid">'
+            f'<div class="status-card coral"><div class="value">{counts[PropertyHealth.NEEDS_ATTENTION]}</div><div class="label">Needs Action</div></div>'
+            f'<div class="status-card amber"><div class="value">{counts[PropertyHealth.WATCH]}</div><div class="label">Watch</div></div>'
+            f'<div class="status-card mint"><div class="value">{counts[PropertyHealth.READY]}</div><div class="label">Ready for Guests</div></div>'
+            f'<div class="status-card blue"><div class="value">{_arrivals_today(daily_result)}</div><div class="label">Arrivals Today</div></div>'
+            '</div>',
             unsafe_allow_html=True,
         )
-    with gate_col:
-        gate_status = "Human review required" if review_count else "Checks passed"
-        st.markdown(
-            '<div class="agent-card"><strong>Safety Gate</strong>'
-            f'<div class="agent-count">{gate_status}</div>'
-            f'<div class="muted">{review_count} review reasons · {error_count} errors</div></div>',
-            unsafe_allow_html=True,
+
+    daily_warning = incomplete_analysis_message(daily_result)
+    if daily_warning:
+        st.error(daily_warning, icon="⚠️")
+
+    if requested_view == "command_center":
+        _render_attention(daily_result)
+        _render_ask_stayops(controller, activity_slot)
+
+    selected_summary = property_names.get(selected_name)
+    selected_property_id = (
+        selected_summary.property_id if selected_summary is not None else None
+    )
+    if requested_view in {"command_center", "properties"}:
+        if selected_summary is None:
+            _section_heading(
+                "portfolio",
+                "Portfolio Overview",
+                "Scan readiness, arrivals, departures, and active property work.",
+            )
+            status_filter = st.radio(
+                "Portfolio status",
+                ["All", "Needs Action", "Watch", "Ready for Guests"],
+                horizontal=True,
+                label_visibility="collapsed",
+                key="portfolio_filter",
+            )
+            _render_portfolio_cards(summaries, daily_result, status_filter)
+        else:
+            st.markdown('<div id="portfolio"></div>', unsafe_allow_html=True)
+            _render_property_drilldown(daily_result, selected_summary)
+
+    if requested_view == "command_center":
+        _render_operations_views(
+            daily_result,
+            selected_property_id,
+            requested_view,
         )
-    with st.expander("Developer details", expanded=False):
-        st.json(
-            {
-                "booking_findings": result.get("booking_findings", []),
-                "guest_findings": result.get("guest_findings", []),
-                "turnover_findings": result.get("turnover_findings", []),
-                "maintenance_findings": result.get("maintenance_findings", []),
-                "synthesis_run": synthesis_run,
-                "agent_runs": result.get("agent_runs", []),
-                "errors": result.get("errors", []),
-            }
+        _render_review(controller, activity_slot)
+    elif requested_view in OPERATIONS_VIEW_TO_TAB:
+        _render_operations_views(
+            daily_result,
+            selected_property_id,
+            requested_view,
         )
+    elif requested_view == "approvals":
+        _render_review(controller, activity_slot)
 
 
 def main() -> None:
@@ -1296,7 +1400,6 @@ def main() -> None:
             ["All properties", *property_names],
             key="property_drilldown",
         )
-        activity_mode = st.toggle("Agent Activity", value=False)
         st.caption(
             f"Operating date · "
             f"{_format_date(daily_result.get('date_scope') or current_operating_date().isoformat())}"
@@ -1304,66 +1407,22 @@ def main() -> None:
         st.markdown("---")
         st.caption("Synthetic operations data · simulated writes only")
 
-    if requested_view == "command_center":
-        st.markdown(
-            '<div class="status-grid">'
-            f'<div class="status-card coral"><div class="value">{counts[PropertyHealth.NEEDS_ATTENTION]}</div><div class="label">Needs Action</div></div>'
-            f'<div class="status-card amber"><div class="value">{counts[PropertyHealth.WATCH]}</div><div class="label">Watch</div></div>'
-            f'<div class="status-card mint"><div class="value">{counts[PropertyHealth.READY]}</div><div class="label">Ready for Guests</div></div>'
-            f'<div class="status-card blue"><div class="value">{_arrivals_today(daily_result)}</div><div class="label">Arrivals Today</div></div>'
-            '</div>',
-            unsafe_allow_html=True,
+    content_column, activity_column = st.columns([3.15, 1], gap="large")
+    with activity_column:
+        with st.container(key="agent_activity_panel"):
+            activity_slot = st.empty()
+            _render_agent_activity(controller, activity_slot)
+    with content_column:
+        _render_dashboard_content(
+            controller=controller,
+            requested_view=requested_view,
+            daily_result=daily_result,
+            summaries=summaries,
+            counts=counts,
+            property_names=property_names,
+            selected_name=selected_name,
+            activity_slot=activity_slot,
         )
-
-    daily_warning = incomplete_analysis_message(daily_result)
-    if daily_warning:
-        st.error(daily_warning, icon="⚠️")
-
-    if requested_view == "command_center":
-        _render_attention(daily_result)
-        _render_ask_stayops(controller)
-
-    selected_summary = property_names.get(selected_name)
-    selected_property_id = (
-        selected_summary.property_id if selected_summary is not None else None
-    )
-    if requested_view in {"command_center", "properties"}:
-        if selected_summary is None:
-            _section_heading(
-                "portfolio",
-                "Portfolio Overview",
-                "Scan readiness, arrivals, departures, and active property work.",
-            )
-            status_filter = st.radio(
-                "Portfolio status",
-                ["All", "Needs Action", "Watch", "Ready for Guests"],
-                horizontal=True,
-                label_visibility="collapsed",
-                key="portfolio_filter",
-            )
-            _render_portfolio_cards(summaries, daily_result, status_filter)
-        else:
-            st.markdown('<div id="portfolio"></div>', unsafe_allow_html=True)
-            _render_property_drilldown(daily_result, selected_summary)
-
-    if requested_view == "command_center":
-        _render_operations_views(
-            daily_result,
-            selected_property_id,
-            requested_view,
-        )
-        _render_review(controller)
-    elif requested_view in OPERATIONS_VIEW_TO_TAB:
-        _render_operations_views(
-            daily_result,
-            selected_property_id,
-            requested_view,
-        )
-    elif requested_view == "approvals":
-        _render_review(controller)
-
-    if activity_mode and controller.result is not None:
-        _render_agent_activity(controller.result)
 
 
 if __name__ == "__main__":

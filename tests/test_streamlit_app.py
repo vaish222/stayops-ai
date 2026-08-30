@@ -283,18 +283,30 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     assert all("existing operations graph" not in item.value for item in app.info)
 
 
-def test_agent_activity_toggle_exposes_specialist_findings() -> None:
+def test_agent_activity_rail_is_ready_before_a_user_request() -> None:
     app = render_app()
-
-    app = app.toggle[0].set_value(True).run()
 
     assert app.exception == []
     assert any("Agent Activity" in item.value for item in app.markdown)
-    assert any("Request Router" in item.value for item in app.markdown)
-    assert any("Operations Synthesizer" in item.value for item in app.markdown)
-    assert any("Safety Gate" in item.value for item in app.markdown)
-    assert any("Completed" in item.value for item in app.markdown)
-    assert any("Human review required" in item.value for item in app.markdown)
+    assert any("Ready for your question" in item.value for item in app.markdown)
+    assert app.toggle == []
+    assert "Developer details" not in {expander.label for expander in app.expander}
+
+
+def test_agent_activity_rail_exposes_completed_execution_steps() -> None:
+    app = render_app()
+    app.text_input[0].input("What needs my attention today?")
+    app = next(
+        button for button in app.button if button.label == "Ask StayOps"
+    ).click().run()
+
+    assert app.exception == []
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Request Router" in page_markup
+    assert "Operations Synthesizer" in page_markup
+    assert "Safety Gate" in page_markup
+    assert "Completed" in page_markup
+    assert "Waiting for your approval" in page_markup
     assert "Developer details" in {expander.label for expander in app.expander}
     assert "Structured run details" not in "\n".join(
         item.value for item in app.markdown
@@ -307,7 +319,6 @@ def test_agent_activity_marks_unselected_agents_as_not_needed() -> None:
     app = next(
         button for button in app.button if button.label == "Ask StayOps"
     ).click().run()
-    app = app.toggle[0].set_value(True).run()
 
     page_markup = "\n".join(item.value for item in app.markdown)
     assert app.exception == []
@@ -366,6 +377,9 @@ def test_approve_executes_the_reviewed_action_without_edit_control() -> None:
     cleaning = controller.result["cleaning_context"]["clean_lake_001"]
     assert "Simulated reminder sent" in cleaning["notes"]
     assert len(controller.runtime_store.action_history()) == 1
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Simulated action completed" in page_markup
+    assert "Waiting for your approval" in page_markup
 
 
 def test_reject_control_records_decision_without_execution() -> None:
@@ -380,6 +394,7 @@ def test_reject_control_records_decision_without_execution() -> None:
     assert controller.pending_review is not None
     assert any("Action rejected — nothing was sent" in item.value for item in app.info)
     page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Action rejected · no write made" in page_markup
     assert "✨ StayOps Answer" not in page_markup
 
 

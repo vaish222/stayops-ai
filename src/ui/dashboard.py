@@ -25,6 +25,29 @@ class PropertyHealth(StrEnum):
     READY = "ready"
 
 
+class ActivityStatus(StrEnum):
+    """User-facing execution state for one activity timeline step."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    NOT_NEEDED = "not_needed"
+    WAITING_APPROVAL = "waiting_approval"
+    FAILED = "failed"
+    FALLBACK = "fallback"
+    REJECTED = "rejected"
+
+
+@dataclass
+class ActivityStep:
+    """One stable row in the live Agent Activity timeline."""
+
+    key: str
+    label: str
+    status: ActivityStatus
+    detail: str
+
+
 @dataclass(frozen=True)
 class PropertySummary:
     property_id: str
@@ -36,6 +59,33 @@ class PropertySummary:
 
 
 SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+ACTIVITY_STEP_LABELS = (
+    ("request_router", "Request Router"),
+    ("load_context", "Context"),
+    ("booking_agent", "Booking"),
+    ("guest_agent", "Guest"),
+    ("turnover_agent", "Turnover"),
+    ("maintenance_agent", "Maintenance"),
+    ("operations_synthesizer", "Operations Synthesizer"),
+    ("risk_action_gate", "Safety Gate"),
+    ("human_review", "Human Approval"),
+    ("action", "Simulated Action"),
+    ("response_generator", "Response"),
+)
+SPECIALIST_ACTIVITY_KEYS = {
+    "booking": "booking_agent",
+    "guest": "guest_agent",
+    "turnover": "turnover_agent",
+    "maintenance": "maintenance_agent",
+}
+TERMINAL_ACTIVITY_STATUSES = {
+    ActivityStatus.COMPLETED,
+    ActivityStatus.NOT_NEEDED,
+    ActivityStatus.FAILED,
+    ActivityStatus.FALLBACK,
+    ActivityStatus.REJECTED,
+}
 
 
 def incomplete_analysis_message(result: dict[str, Any]) -> str | None:
@@ -195,6 +245,9 @@ class DashboardController:
         self.daily_thread_id: str | None = None
         self.last_query: str = ""
         self.has_user_query: bool = False
+        self.activity_steps: dict[str, ActivityStep] = {}
+        self.activity_running: bool = False
+        self._selected_activity_specialists: set[str] = set()
 
     def load_daily_briefing(self) -> dict[str, Any]:
         result = self.run_query(DEFAULT_DAILY_QUERY, user_initiated=False)
@@ -216,6 +269,7 @@ class DashboardController:
         query: str,
         *,
         user_initiated: bool = True,
+        on_activity: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         normalized = query.strip()
         if not normalized:
@@ -223,11 +277,24 @@ class DashboardController:
         self.thread_id = self._thread_id_factory()
         self.config = {"configurable": {"thread_id": self.thread_id}}
         self.last_query = normalized
-        self.result = self.graph.invoke(
-            create_initial_state(normalized, request_id=self.thread_id),
-            config=self.config,
-        )
         self.has_user_query = user_initiated
+        initial_state = create_initial_state(
+            normalized,
+            request_id=self.thread_id,
+        )
+        if user_initiated and on_activity is not None:
+            self._start_activity()
+            on_activity()
+            self.result = self._stream_execution(
+                initial_state,
+                on_activity=on_activity,
+            )
+            on_activity()
+        else:
+            self.result = self.graph.invoke(
+                initial_state,
+                config=self.config,
+            )
         return self.result
 
     @property
@@ -243,6 +310,7 @@ class DashboardController:
         *,
         action_id: str | None = None,
         edited_description: str | None = None,
+        on_activity: Callable[[], None] | None = None,
     ) -> dict[str, Any]:
         if self.pending_review is None or self.config is None:
             raise RuntimeError("there is no interrupted review to resume")
@@ -251,10 +319,323 @@ class DashboardController:
             response["action_id"] = action_id
         if edited_description is not None:
             response["edited_description"] = edited_description
-        self.result = self.graph.invoke(
-            Command(resume=response),
-            config=self.config,
-        )
+        command = Command(resume=response)
+        if on_activity is not None:
+            self._start_review_activity(decision)
+            on_activity()
+            self.result = self._stream_execution(
+                command,
+                on_activity=on_activity,
+            )
+            on_activity()
+        else:
+            self.result = self.graph.invoke(command, config=self.config)
         if self.thread_id == self.daily_thread_id:
             self.daily_result = self.result
         return self.result
+
+    def _new_activity_steps(self) -> dict[str, ActivityStep]:
+        return {
+            key: ActivityStep(
+                key=key,
+                label=label,
+                status=ActivityStatus.QUEUED,
+                detail="Queued",
+            )
+            for key, label in ACTIVITY_STEP_LABELS
+        }
+
+    def _set_activity(
+        self,
+        key: str,
+        status: ActivityStatus,
+        detail: str,
+    ) -> None:
+        step = self.activity_steps[key]
+        step.status = status
+        step.detail = detail
+
+    def _start_activity(self) -> None:
+        self.activity_steps = self._new_activity_steps()
+        self.activity_running = True
+        self._selected_activity_specialists = set()
+        self.result = None
+        self._set_activity(
+            "request_router",
+            ActivityStatus.RUNNING,
+            "Understanding your request…",
+        )
+
+    def _start_review_activity(self, decision: str) -> None:
+        if not self.activity_steps:
+            self.activity_steps = self._new_activity_steps()
+            for key in (
+                "request_router",
+                "load_context",
+                "operations_synthesizer",
+                "risk_action_gate",
+            ):
+                self._set_activity(key, ActivityStatus.COMPLETED, "Completed")
+            selected = (self.result or {}).get("selected_specialists", [])
+            for specialist, key in SPECIALIST_ACTIVITY_KEYS.items():
+                status = (
+                    ActivityStatus.COMPLETED
+                    if specialist in selected
+                    else ActivityStatus.NOT_NEEDED
+                )
+                detail = "Completed" if specialist in selected else "Not needed"
+                self._set_activity(key, status, detail)
+        self.activity_running = True
+        decision_copy = "Recording approval…" if decision == "approve" else "Recording rejection…"
+        self._set_activity(
+            "human_review",
+            ActivityStatus.RUNNING,
+            decision_copy,
+        )
+        self._set_activity("action", ActivityStatus.QUEUED, "Queued")
+
+    def _stream_execution(
+        self,
+        graph_input: Any,
+        *,
+        on_activity: Callable[[], None],
+    ) -> dict[str, Any]:
+        """Stream native LangGraph updates while retaining the invoke result shape."""
+
+        latest_state: dict[str, Any] = {}
+        interrupts: tuple[Any, ...] = ()
+        try:
+            for chunk in self.graph.stream(
+                graph_input,
+                config=self.config,
+                stream_mode=["updates", "values"],
+                version="v2",
+            ):
+                if chunk["type"] == "updates":
+                    for node_name, update in chunk["data"].items():
+                        self._apply_activity_update(node_name, update or {})
+                    on_activity()
+                elif chunk["type"] == "values":
+                    latest_state = dict(chunk["data"])
+                    interrupts = tuple(chunk.get("interrupts", ()))
+        except Exception:
+            for step in self.activity_steps.values():
+                if step.status == ActivityStatus.RUNNING:
+                    step.status = ActivityStatus.FAILED
+                    step.detail = "Execution failed"
+            self.activity_running = False
+            on_activity()
+            raise
+
+        if interrupts:
+            latest_state["__interrupt__"] = interrupts
+        self.activity_running = False
+        self._finalize_activity(latest_state, interrupts)
+        on_activity()
+        return latest_state
+
+    def _apply_activity_update(
+        self,
+        node_name: str,
+        update: dict[str, Any] | tuple[Any, ...],
+    ) -> None:
+        if node_name == "__interrupt__":
+            self._set_activity(
+                "human_review",
+                ActivityStatus.WAITING_APPROVAL,
+                "Waiting for your approval",
+            )
+            return
+
+        if node_name == "request_router":
+            selected = update.get("selected_specialists", [])
+            self._selected_activity_specialists = set(selected)
+            intent = str(update.get("intent", "operations")).replace("_", " ").title()
+            self._set_activity(
+                node_name,
+                ActivityStatus.COMPLETED,
+                f"{intent} request recognized",
+            )
+            self._set_activity(
+                "load_context",
+                ActivityStatus.RUNNING,
+                "Loading operational data…",
+            )
+            return
+
+        if node_name == "load_context":
+            unavailable = update.get("unavailable_sources", [])
+            status = ActivityStatus.FALLBACK if unavailable else ActivityStatus.COMPLETED
+            detail = (
+                f"Partial data · {len(unavailable)} unavailable"
+                if unavailable
+                else "Operational data loaded"
+            )
+            self._set_activity(node_name, status, detail)
+            selected_set = set(
+                update.get(
+                    "selected_specialists",
+                    self._selected_activity_specialists,
+                )
+            )
+            self._selected_activity_specialists = selected_set
+            for specialist, key in SPECIALIST_ACTIVITY_KEYS.items():
+                if specialist in selected_set:
+                    self._set_activity(
+                        key,
+                        ActivityStatus.RUNNING,
+                        "Analyzing…",
+                    )
+                else:
+                    self._set_activity(
+                        key,
+                        ActivityStatus.NOT_NEEDED,
+                        "Not needed for this request",
+                    )
+            return
+
+        if node_name in SPECIALIST_ACTIVITY_KEYS.values():
+            agent_runs = update.get("agent_runs", [])
+            run = agent_runs[-1] if agent_runs else {}
+            failed = run.get("status") == "failed"
+            finding_fields = {
+                "booking_agent": "booking_findings",
+                "guest_agent": "guest_findings",
+                "turnover_agent": "turnover_findings",
+                "maintenance_agent": "maintenance_findings",
+            }
+            count = len(update.get(finding_fields[node_name], []))
+            noun = "finding" if count == 1 else "findings"
+            self._set_activity(
+                node_name,
+                ActivityStatus.FAILED if failed else ActivityStatus.COMPLETED,
+                "Failed · See details" if failed else f"{count} {noun}",
+            )
+            specialist_steps = (
+                self.activity_steps[key] for key in SPECIALIST_ACTIVITY_KEYS.values()
+            )
+            if all(step.status in TERMINAL_ACTIVITY_STATUSES for step in specialist_steps):
+                self._set_activity(
+                    "operations_synthesizer",
+                    ActivityStatus.RUNNING,
+                    "Combining findings…",
+                )
+            return
+
+        if node_name == "operations_synthesizer":
+            synthesis_run = update.get("synthesis_run") or {}
+            run_status = str(synthesis_run.get("status", "completed"))
+            mode = str(synthesis_run.get("mode", "deterministic")).replace("_", " ").title()
+            status = (
+                ActivityStatus.FALLBACK
+                if "fallback" in run_status
+                else ActivityStatus.FAILED
+                if run_status == "failed"
+                else ActivityStatus.COMPLETED
+            )
+            priority_count = len(update.get("priority_items", []))
+            self._set_activity(
+                node_name,
+                status,
+                f"{mode} · {priority_count} prioritized",
+            )
+            self._set_activity(
+                "risk_action_gate",
+                ActivityStatus.RUNNING,
+                "Checking safety and approval rules…",
+            )
+            return
+
+        if node_name == "risk_action_gate":
+            requires_review = bool(update.get("requires_human_review"))
+            review_count = len(update.get("review_reasons", []))
+            self._set_activity(
+                node_name,
+                ActivityStatus.COMPLETED,
+                (
+                    f"Review required · {review_count} reason(s)"
+                    if requires_review
+                    else "Checks passed"
+                ),
+            )
+            if requires_review:
+                self._set_activity(
+                    "human_review",
+                    ActivityStatus.RUNNING,
+                    "Preparing approval request…",
+                )
+            else:
+                self._set_activity(
+                    "human_review",
+                    ActivityStatus.NOT_NEEDED,
+                    "No approval needed",
+                )
+                self._set_activity(
+                    "action",
+                    ActivityStatus.NOT_NEEDED,
+                    "No write requested",
+                )
+                self._set_activity(
+                    "response_generator",
+                    ActivityStatus.RUNNING,
+                    "Preparing your answer…",
+                )
+            return
+
+        if node_name == "human_review":
+            decision = update.get("human_decision", {}).get("decision")
+            if decision:
+                self._set_activity(
+                    node_name,
+                    ActivityStatus.COMPLETED,
+                    f"{str(decision).title()} recorded",
+                )
+            return
+
+        if node_name == "execute_approved_actions":
+            attempts = update.get("action_attempts", [])
+            failed = any(attempt.get("status") == "failed" for attempt in attempts)
+            self._set_activity(
+                "action",
+                ActivityStatus.FAILED if failed else ActivityStatus.COMPLETED,
+                "Simulated action failed" if failed else "Simulated action completed",
+            )
+            return
+
+        if node_name == "record_rejected_action":
+            self._set_activity(
+                "action",
+                ActivityStatus.REJECTED,
+                "Action rejected · no write made",
+            )
+            return
+
+        if node_name == "response_generator":
+            self._set_activity(
+                node_name,
+                ActivityStatus.COMPLETED,
+                "Answer ready",
+            )
+
+    def _finalize_activity(
+        self,
+        result: dict[str, Any],
+        interrupts: tuple[Any, ...],
+    ) -> None:
+        if interrupts:
+            self._set_activity(
+                "human_review",
+                ActivityStatus.WAITING_APPROVAL,
+                "Waiting for your approval",
+            )
+            return
+        if result.get("response_generated"):
+            self._set_activity(
+                "response_generator",
+                ActivityStatus.COMPLETED,
+                "Answer ready",
+            )
+        for step in self.activity_steps.values():
+            if step.status == ActivityStatus.QUEUED:
+                step.status = ActivityStatus.NOT_NEEDED
+                step.detail = "Not needed"
