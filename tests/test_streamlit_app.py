@@ -18,13 +18,36 @@ from src.tools import (
     SimulatedOperationsStore,
 )
 from src.ui import DashboardController
+from src.voice import VoiceTranscription
 
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 REFERENCE_DATE = date(2026, 8, 28)
 
 
-def render_app(view: str | None = None) -> AppTest:
+class FakeVoiceService:
+    can_synthesize = True
+    output_mime_type = "audio/mpeg"
+
+    def __init__(self) -> None:
+        self.transcribed_audio: list[bytes] = []
+        self.spoken_answers: list[str] = []
+
+    def transcribe(self, audio: bytes) -> VoiceTranscription:
+        self.transcribed_audio.append(audio)
+        return VoiceTranscription(text="Who is checking in tomorrow?")
+
+    def synthesize(self, text: str) -> bytes:
+        self.spoken_answers.append(text)
+        return b"simulated-elevenlabs-audio"
+
+
+def render_app(
+    view: str | None = None,
+    *,
+    voice_service: FakeVoiceService | None = None,
+    voice_transcript: str | None = None,
+) -> AppTest:
     runtime_store = SimulatedOperationsStore(
         Path(mkdtemp(prefix="stayops-ui-test-")),
         clock=lambda: datetime.combine(
@@ -39,6 +62,11 @@ def render_app(view: str | None = None) -> AppTest:
     )
     app = AppTest.from_file(APP_PATH, default_timeout=10)
     app.session_state["stayops_controller"] = controller
+    if voice_service is not None:
+        app.session_state["stayops_voice_service"] = voice_service
+    if voice_transcript is not None:
+        app.session_state["stayops_voice_transcript"] = voice_transcript
+        app.session_state["stayops_voice_transcript_editor"] = voice_transcript
     if view is not None:
         app.query_params["view"] = view
     return app.run()
@@ -463,6 +491,93 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     assert "1 arrival is scheduled on Aug 28." in page_markup
     assert "Taylor Moon, 3:00 PM, 2 guests" in page_markup
     assert all("existing operations graph" not in item.value for item in app.info)
+
+
+def test_confirmed_voice_transcript_uses_normal_ask_stayops_workflow() -> None:
+    service = FakeVoiceService()
+    query = "Who is checking in tomorrow?"
+    app = render_app(
+        voice_service=service,
+        voice_transcript=query,
+    )
+
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert app.exception == []
+    assert "Ask by voice" in page_markup
+    assert app.text_input(key="stayops_voice_transcript_editor").value == query
+    assert any(
+        "approvals remain on-screen only" in caption.value
+        for caption in app.caption
+    )
+
+    app = app.button(
+        key="FormSubmitter:confirm_voice_question-Ask StayOps with voice"
+    ).click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert controller.last_query == query
+    assert controller.has_user_query is True
+    assert controller.result["date_scope"] == "2026-08-29"
+    assert controller.result["executed_actions"] == []
+    answer_markup = "\n".join(item.value for item in app.markdown)
+    assert f"“{query}”" in answer_markup
+
+
+def test_spoken_approve_is_a_query_and_never_resumes_human_review() -> None:
+    app = render_app(
+        voice_service=FakeVoiceService(),
+        voice_transcript="approve",
+    )
+
+    app = app.button(
+        key="FormSubmitter:confirm_voice_question-Ask StayOps with voice"
+    ).click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert controller.last_query == "approve"
+    assert controller.result["executed_actions"] == []
+    assert controller.runtime_store.action_history() == []
+    assert controller.pending_review is not None
+
+
+def test_spoken_answer_is_generated_once_and_cached_across_reruns() -> None:
+    service = FakeVoiceService()
+    app = render_app(voice_service=service)
+    query = "Which guests are arriving today?"
+    app.text_input[0].input(query)
+    app = app.button(key="FormSubmitter:ask_stayops-Ask StayOps").click().run()
+
+    play_button = next(
+        button for button in app.button if button.label == "🔊 Play answer"
+    )
+    app = play_button.click().run()
+
+    assert app.exception == []
+    service = app.session_state["stayops_voice_service"]
+    assert len(service.spoken_answers) == 1
+    assert "arrivals are scheduled on Aug 28." in service.spoken_answers[0]
+    assert "**" not in service.spoken_answers[0]
+    assert len(app.session_state["stayops_voice_answer_cache"]) == 1
+
+    app = app.run()
+
+    service = app.session_state["stayops_voice_service"]
+    assert len(service.spoken_answers) == 1
+    assert "🔊 Play answer" not in {button.label for button in app.button}
+
+
+def test_voice_controls_are_not_rendered_on_human_approval_page() -> None:
+    app = render_app("approvals", voice_service=FakeVoiceService())
+
+    assert app.exception == []
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Human Approvals" in page_markup
+    assert "Ask by voice" not in page_markup
+    assert "Ask StayOps with voice" not in {
+        button.label for button in app.button
+    }
 
 
 def test_quick_prompt_is_displayed_with_its_answer() -> None:

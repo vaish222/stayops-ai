@@ -70,6 +70,10 @@ def test_default_controller_uses_current_operating_date(
         "src.agents.request_router.current_operating_date",
         lambda: expected_date,
     )
+    monkeypatch.setattr(
+        "src.ui.dashboard.current_operating_date",
+        lambda: expected_date,
+    )
     controller = DashboardController(
         thread_id_factory=lambda: "dynamic-date-test",
         runtime_store=SimulatedOperationsStore(

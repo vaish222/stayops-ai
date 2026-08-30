@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from datetime import date, datetime, timedelta
 from html import escape
@@ -25,6 +26,12 @@ from src.ui import (
     operations_copy,
     readiness_copy,
     single_date_from_scope,
+)
+from src.voice import (
+    ElevenLabsVoiceService,
+    VoiceService,
+    VoiceServiceError,
+    VoiceSettings,
 )
 
 
@@ -136,6 +143,12 @@ def _install_theme() -> None:
         .answer-date-context {
             color:var(--teal-dark); font-size:.88rem; font-weight:780; margin:-.2rem 0 .75rem;
         }
+        .st-key-stayops_voice {
+            background:#f7fbf9; border-color:#c9ddd6; border-radius:14px;
+            margin:.75rem 0;
+        }
+        .voice-title { color:var(--navy); font-size:.96rem; font-weight:820; }
+        .voice-copy { color:var(--muted); font-size:.78rem; margin:.12rem 0 .5rem; }
         [data-testid="stMetric"] {
             background: var(--card);
             border: 1px solid var(--line);
@@ -309,6 +322,25 @@ def _controller() -> DashboardController:
     if controller.daily_briefing_needs_refresh_for(dashboard_date):
         controller.load_daily_briefing(dashboard_date)
     return controller
+
+
+def _configured_voice_service() -> tuple[VoiceService | None, str | None]:
+    """Build the optional voice boundary without affecting graph startup."""
+
+    existing = st.session_state.get("stayops_voice_service")
+    if existing is not None:
+        return existing, None
+    try:
+        settings = VoiceSettings.from_environment()
+        if not settings.enabled:
+            return None, None
+        service = ElevenLabsVoiceService(settings)
+    except (ValueError, VoiceServiceError) as exc:
+        return None, str(exc)
+    except Exception:
+        return None, "ElevenLabs voice configuration could not be initialized."
+    st.session_state.stayops_voice_service = service
+    return service, None
 
 
 def _set_dashboard_date(value: date) -> None:
@@ -790,12 +822,118 @@ def _render_attention(
             )
 
 
+def _clear_voice_transcript() -> None:
+    """Discard transcript state when the microphone recording changes."""
+
+    st.session_state.pop("stayops_voice_transcript", None)
+    st.session_state.pop("stayops_voice_transcript_editor", None)
+
+
+def _render_voice_question(
+    controller: DashboardController,
+    voice_service: VoiceService,
+    activity_slot: Any | None,
+) -> None:
+    """Capture and confirm a transcript before using the normal query path."""
+
+    with st.container(border=True, key="stayops_voice"):
+        st.markdown(
+            '<div class="voice-title">🎙 Ask by voice</div>'
+            '<div class="voice-copy">Record a question, review the transcript, '
+            'then send it through the same StayOps safety workflow.</div>',
+            unsafe_allow_html=True,
+        )
+        recording = st.audio_input(
+            "Record an Ask StayOps question",
+            sample_rate=16_000,
+            key="stayops_voice_recording",
+            on_change=_clear_voice_transcript,
+        )
+        if recording is not None and st.button(
+            "Transcribe recording",
+            key="transcribe_voice_question",
+        ):
+            try:
+                with st.spinner("Transcribing your question with ElevenLabs…"):
+                    transcription = voice_service.transcribe(
+                        recording.getvalue()
+                    )
+            except VoiceServiceError as exc:
+                st.session_state.stayops_notice = ("error", str(exc))
+            else:
+                st.session_state.stayops_voice_transcript = transcription.text
+                st.session_state.stayops_voice_transcript_editor = (
+                    transcription.text
+                )
+                st.session_state.pop("stayops_notice", None)
+
+        transcript = st.session_state.get("stayops_voice_transcript")
+        if transcript:
+            with st.form("confirm_voice_question"):
+                confirmed_transcript = st.text_input(
+                    "I heard",
+                    key="stayops_voice_transcript_editor",
+                    help="Edit any transcription errors before asking StayOps.",
+                )
+                submitted = st.form_submit_button(
+                    "Ask StayOps with voice",
+                    type="primary",
+                )
+            if submitted:
+                _run_query(
+                    controller,
+                    confirmed_transcript,
+                    activity_slot,
+                )
+        st.caption(
+            "Voice can ask operational questions, but approvals remain on-screen only."
+        )
+
+
+def _spoken_answer_text(answer: str) -> str:
+    """Remove Markdown punctuation that should not be read aloud."""
+
+    spoken = re.sub(r"(?m)^#{1,6}\s*", "", answer)
+    spoken = re.sub(r"(?m)^\s*[-*]\s+", "", spoken)
+    spoken = spoken.replace("**", "").replace("`", "")
+    return re.sub(r"\n{2,}", "\n", spoken).strip()
+
+
+def _render_spoken_answer(
+    voice_service: VoiceService | None,
+    answer: str,
+) -> None:
+    """Generate TTS only on demand and cache only the latest answer audio."""
+
+    if voice_service is None or not voice_service.can_synthesize:
+        return
+    digest = hashlib.sha256(answer.encode("utf-8")).hexdigest()
+    cached = st.session_state.get("stayops_voice_answer_cache", {})
+    audio = cached.get(digest)
+    if audio is None and st.button(
+        "🔊 Play answer",
+        key=f"play_stayops_answer_{digest[:12]}",
+    ):
+        try:
+            with st.spinner("Preparing the spoken StayOps answer…"):
+                audio = voice_service.synthesize(
+                    _spoken_answer_text(answer)
+                )
+        except VoiceServiceError as exc:
+            st.error(str(exc))
+        else:
+            st.session_state.stayops_voice_answer_cache = {digest: audio}
+    if audio is not None:
+        st.audio(audio, format=voice_service.output_mime_type)
+
+
 def _render_ask_stayops(
     controller: DashboardController,
     dashboard_date: date,
     today: date,
     activity_slot: Any | None = None,
 ) -> None:
+    voice_service, voice_error = _configured_voice_service()
     _section_heading(
         "ask-stayops",
         "Ask StayOps",
@@ -811,6 +949,11 @@ def _render_ask_stayops(
     if submitted:
         _run_query(controller, query, activity_slot)
 
+    if voice_service is not None:
+        _render_voice_question(controller, voice_service, activity_slot)
+    elif voice_error is not None:
+        st.warning(f"Voice input is unavailable: {voice_error}")
+
     quick_prompts = {
         "What's urgent today?": "What's urgent today?",
         "Who's checking in?": "Which guests are arriving today?",
@@ -824,7 +967,12 @@ def _render_ask_stayops(
         if column.button(label, key=f"quick_prompt_{label}", width="stretch"):
             _run_query(controller, prompt, activity_slot)
     _show_notice()
-    _render_stayops_answer(controller, dashboard_date, today)
+    _render_stayops_answer(
+        controller,
+        dashboard_date,
+        today,
+        voice_service,
+    )
 
 
 def _property_card_details(
@@ -1526,6 +1674,7 @@ def _render_stayops_answer(
     controller: DashboardController,
     dashboard_date: date,
     today: date,
+    voice_service: VoiceService | None = None,
 ) -> None:
     if not controller.has_user_query:
         return
@@ -1549,7 +1698,9 @@ def _render_stayops_answer(
             f'{escape(format_answer_date_context(query_scope, today))}</div>',
             unsafe_allow_html=True,
         )
-        st.markdown(_stayops_answer(controller))
+        answer = _stayops_answer(controller)
+        st.markdown(answer)
+        _render_spoken_answer(voice_service, answer)
         if query_date is not None and query_date != dashboard_date:
             st.button(
                 f"View {format_date_context(query_date, today)} operations →",

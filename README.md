@@ -92,7 +92,8 @@ stayops-ai/
 │   ├── safety/
 │   ├── time_context.py
 │   ├── tools/
-│   └── ui/
+│   ├── ui/
+│   └── voice/
 │
 ├── evaluation/
 └── tests/
@@ -161,6 +162,8 @@ StayOps is built as a stateful LangGraph workflow rather than a single LLM call.
 The four specialist nodes fan out from the context loader and run in parallel when selected; maintenance is not downstream of the other specialists. The Streamlit approval UI currently exposes per-action **Approve** and **Reject** controls. The backend human-review contract also supports **Edit → Reconfirm** for programmatic callers, but that control is not exposed in the current UI.
 
 Every approved write receives a one-time capability bound to the exact request, action, parameters, and write tool. Reusing the capability or changing the reviewed action causes the simulated write to be rejected.
+
+The optional ElevenLabs voice interface wraps **Ask StayOps** only: recorded audio is transcribed, confirmed by the user, and submitted through the same request router. Spoken answers are generated on demand. Voice is not connected to the human-review resume path, so approvals and rejections remain on-screen only.
 <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/360033b1-3d99-4d03-8a05-d37eaf79d934" />
 
 
@@ -220,6 +223,7 @@ Unavailable source data is never treated as an all-clear. Persistent read failur
 | Validation         | Pydantic               |
 | Hosted LLM         | Nebius                 |
 | Local LLM          | Ollama                 |
+| Voice interface    | ElevenLabs (optional)  |
 | UI                 | Streamlit              |
 | Package Management | uv                     |
 | Testing            | pytest                 |
@@ -292,6 +296,23 @@ NEBIUS_API_KEY="replace-with-nebius-api-key" \
 LLM_BASE_URL=https://api.tokenfactory.nebius.com/v1/ \
 uv run streamlit run app.py
 ```
+
+### Enable ElevenLabs voice for Ask StayOps
+
+Voice is disabled by default. Add a restricted ElevenLabs key and a voice ID to `.env` to enable push-to-talk questions and on-demand spoken answers:
+
+```bash
+VOICE_ENABLED=true
+ELEVENLABS_API_KEY="replace-with-restricted-elevenlabs-key"
+ELEVENLABS_STT_MODEL=scribe_v2
+ELEVENLABS_TTS_MODEL=eleven_flash_v2_5
+ELEVENLABS_VOICE_ID="replace-with-elevenlabs-voice-id"
+ELEVENLABS_OUTPUT_FORMAT=mp3_44100_128
+ELEVENLABS_LANGUAGE_CODE=eng
+VOICE_MAX_SECONDS=30
+```
+
+Export `.env` before starting Streamlit as shown above. Voice is available only in **Ask StayOps**. It cannot approve, reject, or resume a human-review action; approvals remain on-screen only.
 
 Never commit API keys to the repository.
 
