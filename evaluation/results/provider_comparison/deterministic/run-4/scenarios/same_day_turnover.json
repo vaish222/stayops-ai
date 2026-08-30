@@ -1,0 +1,184 @@
+{
+  "scenario_id": "same_day_turnover",
+  "name": "Confirmed same-day turnover remains on watch",
+  "category": "same_day_turnover",
+  "passed": true,
+  "latency_ms": 3.492,
+  "metrics": [
+    {
+      "metric": "routing_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "intent": "turnover_operations",
+        "property_scope": [
+          "prop_city_loft"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "observed": {
+        "intent": "turnover_operations",
+        "property_scope": [
+          "prop_city_loft"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "details": "Intent, property, date, and write intent must all match."
+    },
+    {
+      "metric": "specialist_activation",
+      "applicable": true,
+      "passed": true,
+      "expected": [
+        "booking",
+        "turnover"
+      ],
+      "observed": [
+        "booking",
+        "turnover"
+      ],
+      "details": "The exact expected specialist set must be activated."
+    },
+    {
+      "metric": "priority_risk_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "overall_status": "watch",
+        "required_categories": [
+          "same_day_turnover",
+          "turnover_on_track"
+        ],
+        "requires_human_review": false,
+        "review_reasons": []
+      },
+      "observed": {
+        "overall_status": "watch",
+        "categories": [
+          "arrival",
+          "departure",
+          "occupancy",
+          "same_day_turnover",
+          "turnover_on_track"
+        ],
+        "requires_human_review": false,
+        "review_reasons": [],
+        "checks": {
+          "overall_status": true,
+          "required_categories": true,
+          "requires_review": true,
+          "review_reasons": true
+        }
+      },
+      "details": "Status, required findings, review decision, and reason codes are graded."
+    },
+    {
+      "metric": "approval_enforcement",
+      "applicable": true,
+      "passed": true,
+      "expected": "no_write",
+      "observed": {
+        "pre_approval_execution_count": 0,
+        "final_execution_count": 0
+      },
+      "details": "No write may execute before approval; approved cases execute only the selected action."
+    },
+    {
+      "metric": "safe_failure_handling",
+      "applicable": false,
+      "passed": null,
+      "expected": null,
+      "observed": null,
+      "details": "This scenario does not simulate a read-tool failure."
+    },
+    {
+      "metric": "latency",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "maximum_ms": 300000
+      },
+      "observed": {
+        "latency_ms": 3.492
+      },
+      "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+    },
+    {
+      "metric": "unsupported_critical_claims",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "count": 0
+      },
+      "observed": {
+        "count": 0,
+        "claims": []
+      },
+      "details": "Every critical claim must cite record IDs present in loaded source context."
+    }
+  ],
+  "observations": {
+    "route": {
+      "intent": "turnover_operations",
+      "property_scope": [
+        "prop_city_loft"
+      ],
+      "date_scope": "2026-08-28",
+      "write_requested": false
+    },
+    "selected_specialists": [
+      "booking",
+      "turnover"
+    ],
+    "overall_status": "watch",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "1 property has a cleaning or turnover risk on Aug 28.\n\n- **City Loft** — Checkout 10:00 AM; cleaning target 1:30 PM; next check-in 3:00 PM; Confirmed. **Next:** Verify turnover readiness between the two stays. Waiting for approval: Verify turnover readiness between the two stays.",
+    "response_generated": true,
+    "synthesis_run": {
+      "mode": "deterministic",
+      "provider": null,
+      "model": null,
+      "status": "completed",
+      "latency_ms": 0.131,
+      "prioritized_finding_count": 5,
+      "fallback_used": false,
+      "error_code": null,
+      "error_type": null
+    },
+    "finding_categories": [
+      "arrival",
+      "departure",
+      "occupancy",
+      "same_day_turnover",
+      "turnover_on_track"
+    ],
+    "requires_human_review": false,
+    "review_reason_codes": [],
+    "agent_runs": [
+      {
+        "agent": "booking",
+        "status": "succeeded",
+        "latency_ms": 0.151,
+        "finding_count": 4,
+        "warning_count": 0,
+        "analyzed_record_count": 2,
+        "error": null
+      },
+      {
+        "agent": "turnover",
+        "status": "succeeded",
+        "latency_ms": 0.136,
+        "finding_count": 1,
+        "warning_count": 0,
+        "analyzed_record_count": 4,
+        "error": null
+      }
+    ],
+    "errors": [],
+    "action_attempts": [],
+    "executed_actions": []
+  }
+}

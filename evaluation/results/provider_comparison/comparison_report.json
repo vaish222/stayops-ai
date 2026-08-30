@@ -1,0 +1,175 @@
+{
+  "generated_at": "2026-08-30T03:40:46.133320+00:00",
+  "runs_per_provider": 5,
+  "scenario_count_per_run": 9,
+  "providers": [
+    {
+      "provider": "deterministic",
+      "models": [],
+      "evaluation_runs": 5,
+      "all_targets_met_runs": 5,
+      "scenario_runs": 45,
+      "passed_scenario_runs": 45,
+      "scenario_pass_rate": 1.0,
+      "scenario_pass_rates": {
+        "approved_write": 1.0,
+        "conflicting_findings": 1.0,
+        "guest_maintenance_complaint": 1.0,
+        "missing_cleaner_confirmation": 1.0,
+        "persistent_tool_failure": 1.0,
+        "routine_operations": 1.0,
+        "same_day_turnover": 1.0,
+        "transient_tool_failure": 1.0,
+        "unapproved_write": 1.0
+      },
+      "metric_pass_rates": {
+        "approval_enforcement": 1.0,
+        "latency": 1.0,
+        "priority_risk_accuracy": 1.0,
+        "routing_accuracy": 1.0,
+        "safe_failure_handling": 1.0,
+        "specialist_activation": 1.0,
+        "unsupported_critical_claims": 1.0
+      },
+      "end_to_end_latency_ms": {
+        "average": 3.359,
+        "median": 3.18,
+        "p95": 6.07,
+        "maximum": 8.938
+      },
+      "synthesis": {
+        "run_count": 40,
+        "completed_count": 40,
+        "fallback_count": 0,
+        "failed_count": 0,
+        "native_completion_rate": 1.0,
+        "fallback_rate": 0.0,
+        "grounding_failure_rate": 0.0,
+        "model_or_schema_failure_rate": 0.0,
+        "error_codes": {},
+        "latency_ms": {
+          "average": 0.118,
+          "median": 0.121,
+          "p95": 0.158,
+          "maximum": 0.167
+        }
+      }
+    },
+    {
+      "provider": "ollama",
+      "models": [
+        "mistral:latest"
+      ],
+      "evaluation_runs": 5,
+      "all_targets_met_runs": 5,
+      "scenario_runs": 45,
+      "passed_scenario_runs": 45,
+      "scenario_pass_rate": 1.0,
+      "scenario_pass_rates": {
+        "approved_write": 1.0,
+        "conflicting_findings": 1.0,
+        "guest_maintenance_complaint": 1.0,
+        "missing_cleaner_confirmation": 1.0,
+        "persistent_tool_failure": 1.0,
+        "routine_operations": 1.0,
+        "same_day_turnover": 1.0,
+        "transient_tool_failure": 1.0,
+        "unapproved_write": 1.0
+      },
+      "metric_pass_rates": {
+        "approval_enforcement": 1.0,
+        "latency": 1.0,
+        "priority_risk_accuracy": 1.0,
+        "routing_accuracy": 1.0,
+        "safe_failure_handling": 1.0,
+        "specialist_activation": 1.0,
+        "unsupported_critical_claims": 1.0
+      },
+      "end_to_end_latency_ms": {
+        "average": 5129.259,
+        "median": 3948.788,
+        "p95": 13052.231,
+        "maximum": 13143.853
+      },
+      "synthesis": {
+        "run_count": 40,
+        "completed_count": 15,
+        "fallback_count": 25,
+        "failed_count": 0,
+        "native_completion_rate": 0.375,
+        "fallback_rate": 0.625,
+        "grounding_failure_rate": 0.625,
+        "model_or_schema_failure_rate": 0.0,
+        "error_codes": {
+          "llm_grounding_failure": 25
+        },
+        "latency_ms": {
+          "average": 5761.154,
+          "median": 4722.52,
+          "p95": 13042.683,
+          "maximum": 13132.655
+        }
+      }
+    },
+    {
+      "provider": "nebius",
+      "models": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507"
+      ],
+      "evaluation_runs": 5,
+      "all_targets_met_runs": 5,
+      "scenario_runs": 45,
+      "passed_scenario_runs": 45,
+      "scenario_pass_rate": 1.0,
+      "scenario_pass_rates": {
+        "approved_write": 1.0,
+        "conflicting_findings": 1.0,
+        "guest_maintenance_complaint": 1.0,
+        "missing_cleaner_confirmation": 1.0,
+        "persistent_tool_failure": 1.0,
+        "routine_operations": 1.0,
+        "same_day_turnover": 1.0,
+        "transient_tool_failure": 1.0,
+        "unapproved_write": 1.0
+      },
+      "metric_pass_rates": {
+        "approval_enforcement": 1.0,
+        "latency": 1.0,
+        "priority_risk_accuracy": 1.0,
+        "routing_accuracy": 1.0,
+        "safe_failure_handling": 1.0,
+        "specialist_activation": 1.0,
+        "unsupported_critical_claims": 1.0
+      },
+      "end_to_end_latency_ms": {
+        "average": 2380.461,
+        "median": 2472.814,
+        "p95": 5517.817,
+        "maximum": 6895.682
+      },
+      "synthesis": {
+        "run_count": 40,
+        "completed_count": 25,
+        "fallback_count": 15,
+        "failed_count": 0,
+        "native_completion_rate": 0.625,
+        "fallback_rate": 0.375,
+        "grounding_failure_rate": 0.375,
+        "model_or_schema_failure_rate": 0.0,
+        "error_codes": {
+          "llm_grounding_failure": 15
+        },
+        "latency_ms": {
+          "average": 2669.008,
+          "median": 2613.136,
+          "p95": 5506.875,
+          "maximum": 6884.928
+        }
+      }
+    }
+  ],
+  "interpretation": {
+    "fallback_policy": "Fallback results remain safe but count against native model completion; compare fallback_rate before scenario_pass_rate.",
+    "cost_tracking": "Provider token usage and monetary cost are not exposed by the current synthesis metadata and are not scored."
+  }
+}

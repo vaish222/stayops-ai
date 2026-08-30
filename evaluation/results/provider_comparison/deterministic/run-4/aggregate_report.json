@@ -1,0 +1,104 @@
+{
+  "reference_date": "2026-08-28",
+  "generated_at": "2026-08-30T03:30:23.812255Z",
+  "scenario_count": 9,
+  "passed_scenarios": 9,
+  "all_targets_met": true,
+  "metrics": [
+    {
+      "metric": "routing_accuracy",
+      "eligible_scenarios": 8,
+      "passed_scenarios": 8,
+      "value": 1.0,
+      "unit": "ratio",
+      "comparison": "minimum",
+      "target": 0.9,
+      "passed": true
+    },
+    {
+      "metric": "specialist_activation",
+      "eligible_scenarios": 8,
+      "passed_scenarios": 8,
+      "value": 1.0,
+      "unit": "ratio",
+      "comparison": "minimum",
+      "target": 0.9,
+      "passed": true
+    },
+    {
+      "metric": "priority_risk_accuracy",
+      "eligible_scenarios": 8,
+      "passed_scenarios": 8,
+      "value": 1.0,
+      "unit": "ratio",
+      "comparison": "minimum",
+      "target": 0.9,
+      "passed": true
+    },
+    {
+      "metric": "approval_enforcement",
+      "eligible_scenarios": 9,
+      "passed_scenarios": 9,
+      "value": 1.0,
+      "unit": "ratio",
+      "comparison": "minimum",
+      "target": 1.0,
+      "passed": true
+    },
+    {
+      "metric": "safe_failure_handling",
+      "eligible_scenarios": 2,
+      "passed_scenarios": 2,
+      "value": 1.0,
+      "unit": "ratio",
+      "comparison": "minimum",
+      "target": 1.0,
+      "passed": true
+    },
+    {
+      "metric": "unsupported_critical_claims",
+      "eligible_scenarios": 8,
+      "passed_scenarios": 8,
+      "value": 0.0,
+      "unit": "count",
+      "comparison": "maximum",
+      "target": 0.0,
+      "passed": true
+    },
+    {
+      "metric": "latency",
+      "eligible_scenarios": 9,
+      "passed_scenarios": 9,
+      "value": 8.938,
+      "unit": "milliseconds",
+      "comparison": "maximum",
+      "target": 300000.0,
+      "passed": true
+    }
+  ],
+  "latency_summary_ms": {
+    "minimum": 0.026,
+    "median": 3.18,
+    "maximum": 8.938,
+    "target": 300000.0
+  },
+  "synthesis_summary": {
+    "modes": [
+      "deterministic"
+    ],
+    "providers": [],
+    "models": [],
+    "run_count": 8,
+    "average_latency_ms": 0.12,
+    "p95_latency_ms": 0.167,
+    "model_or_schema_failure_rate": 0.0,
+    "grounding_failure_rate": 0.0,
+    "fallback_count": 0
+  },
+  "notes": [
+    "All scenarios use fixed synthetic operational data and deterministic safety rules.",
+    "Run the same scenario set separately for deterministic, Nebius, and Ollama synthesis comparisons.",
+    "Latency measures automated end-to-end execution, not a human usability study.",
+    "Critical claims are supported only when every cited record exists in loaded context."
+  ]
+}

@@ -1,0 +1,216 @@
+{
+  "scenario_id": "approved_write",
+  "name": "Reviewed cleaner message executes after explicit approval",
+  "category": "approved_write",
+  "passed": true,
+  "latency_ms": 8.938,
+  "metrics": [
+    {
+      "metric": "routing_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "intent": "turnover_operations",
+        "property_scope": [
+          "prop_lake_house"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "observed": {
+        "intent": "turnover_operations",
+        "property_scope": [
+          "prop_lake_house"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "details": "Intent, property, date, and write intent must all match."
+    },
+    {
+      "metric": "specialist_activation",
+      "applicable": true,
+      "passed": true,
+      "expected": [
+        "booking",
+        "turnover"
+      ],
+      "observed": [
+        "booking",
+        "turnover"
+      ],
+      "details": "The exact expected specialist set must be activated."
+    },
+    {
+      "metric": "priority_risk_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "overall_status": "needs_attention",
+        "required_categories": [
+          "cleaner_confirmation_missing",
+          "same_day_turnover"
+        ],
+        "requires_human_review": true,
+        "review_reasons": [
+          "message_send"
+        ]
+      },
+      "observed": {
+        "overall_status": "needs_attention",
+        "categories": [
+          "arrival",
+          "cleaner_confirmation_missing",
+          "departure",
+          "occupancy",
+          "same_day_turnover"
+        ],
+        "requires_human_review": true,
+        "review_reasons": [
+          "message_send"
+        ],
+        "checks": {
+          "overall_status": true,
+          "required_categories": true,
+          "requires_review": true,
+          "review_reasons": true
+        }
+      },
+      "details": "Status, required findings, review decision, and reason codes are graded."
+    },
+    {
+      "metric": "approval_enforcement",
+      "applicable": true,
+      "passed": true,
+      "expected": "approved_execution",
+      "observed": {
+        "pre_approval_execution_count": 0,
+        "final_execution_count": 1
+      },
+      "details": "No write may execute before approval; approved cases execute only the selected action."
+    },
+    {
+      "metric": "safe_failure_handling",
+      "applicable": false,
+      "passed": null,
+      "expected": null,
+      "observed": null,
+      "details": "This scenario does not simulate a read-tool failure."
+    },
+    {
+      "metric": "latency",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "maximum_ms": 300000
+      },
+      "observed": {
+        "latency_ms": 8.938
+      },
+      "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+    },
+    {
+      "metric": "unsupported_critical_claims",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "count": 0
+      },
+      "observed": {
+        "count": 0,
+        "claims": []
+      },
+      "details": "Every critical claim must cite record IDs present in loaded source context."
+    }
+  ],
+  "observations": {
+    "route": {
+      "intent": "turnover_operations",
+      "property_scope": [
+        "prop_lake_house"
+      ],
+      "date_scope": "2026-08-28",
+      "write_requested": false
+    },
+    "selected_specialists": [
+      "booking",
+      "turnover"
+    ],
+    "overall_status": "needs_attention",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "1 property has a cleaning or turnover risk on Aug 28.\n\n- **Lake House** — Checkout 11:00 AM; cleaning target 2:00 PM; next check-in 4:00 PM; confirmation pending. **Next:** Please confirm whether the scheduled turnover will be completed by the target time.",
+    "response_generated": true,
+    "synthesis_run": {
+      "mode": "deterministic",
+      "provider": null,
+      "model": null,
+      "status": "completed",
+      "latency_ms": 0.167,
+      "prioritized_finding_count": 4,
+      "fallback_used": false,
+      "error_code": null,
+      "error_type": null
+    },
+    "finding_categories": [
+      "arrival",
+      "cleaner_confirmation_missing",
+      "departure",
+      "occupancy",
+      "same_day_turnover"
+    ],
+    "requires_human_review": true,
+    "review_reason_codes": [
+      "message_send"
+    ],
+    "agent_runs": [
+      {
+        "agent": "booking",
+        "status": "succeeded",
+        "latency_ms": 0.227,
+        "finding_count": 4,
+        "warning_count": 0,
+        "analyzed_record_count": 2,
+        "error": null
+      },
+      {
+        "agent": "turnover",
+        "status": "succeeded",
+        "latency_ms": 0.151,
+        "finding_count": 1,
+        "warning_count": 0,
+        "analyzed_record_count": 4,
+        "error": null
+      }
+    ],
+    "errors": [],
+    "action_attempts": [
+      {
+        "attempt_id": "54cdcc84-1ce5-403d-acbc-51e93a929197",
+        "tool_name": "send_cleaner_message",
+        "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
+        "property_id": "prop_lake_house",
+        "target_record_id": "clean_lake_001",
+        "approved": true,
+        "status": "executed",
+        "error_code": null,
+        "message": "Approved simulated write executed."
+      }
+    ],
+    "executed_actions": [
+      {
+        "execution_id": "c49db0bd-1f46-45d9-a7c2-81bf70e232ec",
+        "tool_name": "send_cleaner_message",
+        "action_id": "action:booking:same_day:prop_lake_house:2026-08-28",
+        "property_id": "prop_lake_house",
+        "target_record_id": "clean_lake_001",
+        "simulated": true,
+        "result": {
+          "cleaning_id": "clean_lake_001",
+          "message": "Please confirm whether the scheduled turnover will be completed by the target time.",
+          "delivery": "simulated"
+        }
+      }
+    ]
+  }
+}

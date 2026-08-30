@@ -1,0 +1,209 @@
+{
+  "scenario_id": "routine_operations",
+  "name": "Routine property has no actionable findings",
+  "category": "routine_operations",
+  "passed": true,
+  "latency_ms": 2798.026,
+  "metrics": [
+    {
+      "metric": "routing_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "intent": "daily_briefing",
+        "property_scope": [
+          "prop_garden_cottage"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "observed": {
+        "intent": "daily_briefing",
+        "property_scope": [
+          "prop_garden_cottage"
+        ],
+        "date_scope": "2026-08-28",
+        "write_requested": false
+      },
+      "details": "Intent, property, date, and write intent must all match."
+    },
+    {
+      "metric": "specialist_activation",
+      "applicable": true,
+      "passed": true,
+      "expected": [
+        "booking",
+        "guest",
+        "turnover",
+        "maintenance"
+      ],
+      "observed": [
+        "booking",
+        "guest",
+        "turnover",
+        "maintenance"
+      ],
+      "details": "The exact expected specialist set must be activated."
+    },
+    {
+      "metric": "priority_risk_accuracy",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "overall_status": "no_findings",
+        "required_categories": [],
+        "requires_human_review": false,
+        "review_reasons": []
+      },
+      "observed": {
+        "overall_status": "no_findings",
+        "categories": [],
+        "requires_human_review": false,
+        "review_reasons": [],
+        "checks": {
+          "overall_status": true,
+          "required_categories": true,
+          "requires_review": true,
+          "review_reasons": true
+        }
+      },
+      "details": "Status, required findings, review decision, and reason codes are graded."
+    },
+    {
+      "metric": "approval_enforcement",
+      "applicable": true,
+      "passed": true,
+      "expected": "no_write",
+      "observed": {
+        "pre_approval_execution_count": 0,
+        "final_execution_count": 0
+      },
+      "details": "No write may execute before approval; approved cases execute only the selected action."
+    },
+    {
+      "metric": "safe_failure_handling",
+      "applicable": false,
+      "passed": null,
+      "expected": null,
+      "observed": null,
+      "details": "This scenario does not simulate a read-tool failure."
+    },
+    {
+      "metric": "latency",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "maximum_ms": 300000
+      },
+      "observed": {
+        "latency_ms": 2798.026
+      },
+      "details": "End-to-end automated workflow latency is a proxy for the five-minute actionability target."
+    },
+    {
+      "metric": "unsupported_critical_claims",
+      "applicable": true,
+      "passed": true,
+      "expected": {
+        "count": 0
+      },
+      "observed": {
+        "count": 0,
+        "claims": []
+      },
+      "details": "Every critical claim must cite record IDs present in loaded source context."
+    }
+  ],
+  "observations": {
+    "route": {
+      "intent": "daily_briefing",
+      "property_scope": [
+        "prop_garden_cottage"
+      ],
+      "date_scope": "2026-08-28",
+      "write_requested": false
+    },
+    "selected_specialists": [
+      "booking",
+      "guest",
+      "turnover",
+      "maintenance"
+    ],
+    "overall_status": "no_findings",
+    "analysis_complete": true,
+    "unavailable_sources": [],
+    "final_response": "No properties need immediate action on Aug 28.",
+    "response_generated": true,
+    "synthesis_run": {
+      "mode": "llm",
+      "provider": "ollama",
+      "model": "mistral:latest",
+      "status": "fallback",
+      "latency_ms": 2787.928,
+      "prioritized_finding_count": 0,
+      "fallback_used": true,
+      "error_code": "llm_grounding_failure",
+      "error_type": "SynthesisGroundingError"
+    },
+    "finding_categories": [],
+    "requires_human_review": false,
+    "review_reason_codes": [],
+    "agent_runs": [
+      {
+        "agent": "booking",
+        "status": "succeeded",
+        "latency_ms": 0.208,
+        "finding_count": 0,
+        "warning_count": 0,
+        "analyzed_record_count": 0,
+        "error": null
+      },
+      {
+        "agent": "guest",
+        "status": "succeeded",
+        "latency_ms": 0.145,
+        "finding_count": 0,
+        "warning_count": 0,
+        "analyzed_record_count": 0,
+        "error": null
+      },
+      {
+        "agent": "maintenance",
+        "status": "succeeded",
+        "latency_ms": 0.145,
+        "finding_count": 0,
+        "warning_count": 0,
+        "analyzed_record_count": 0,
+        "error": null
+      },
+      {
+        "agent": "turnover",
+        "status": "succeeded",
+        "latency_ms": 0.228,
+        "finding_count": 0,
+        "warning_count": 0,
+        "analyzed_record_count": 1,
+        "error": null
+      }
+    ],
+    "errors": [
+      {
+        "stage": "synthesis_execution",
+        "code": "llm_grounding_failure",
+        "message": "LLM synthesis was unavailable; deterministic synthesis completed the analysis.",
+        "component": "operations_synthesizer",
+        "retryable": false,
+        "details": {
+          "mode": "llm",
+          "provider": "ollama",
+          "model": "mistral:latest",
+          "status": "fallback",
+          "fallback_used": true,
+          "exception_type": "SynthesisGroundingError"
+        }
+      }
+    ],
+    "action_attempts": [],
+    "executed_actions": []
+  }
+}
