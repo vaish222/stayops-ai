@@ -161,7 +161,8 @@ StayOps is built as a stateful LangGraph workflow rather than a single LLM call.
 The four specialist nodes fan out from the context loader and run in parallel when selected; maintenance is not downstream of the other specialists. The Streamlit approval UI currently exposes per-action **Approve** and **Reject** controls. The backend human-review contract also supports **Edit → Reconfirm** for programmatic callers, but that control is not exposed in the current UI.
 
 Every approved write receives a one-time capability bound to the exact request, action, parameters, and write tool. Reusing the capability or changing the reviewed action causes the simulated write to be rejected.
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/7a86fd82-ee5e-4e06-9f79-4c5429ca5ad1" />
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/360033b1-3d99-4d03-8a05-d37eaf79d934" />
+
 
 
 ---
