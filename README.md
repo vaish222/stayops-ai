@@ -68,6 +68,7 @@ StayOps currently manages four operational areas across eight synthetic properti
 
 # Project Structure
 
+```text
 stayops-ai/
 │
 ├── app.py
@@ -90,6 +91,7 @@ stayops-ai/
 │
 ├── evaluation/
 └── tests/
+```
 
 ---
 
@@ -281,4 +283,3 @@ StayOps AI succeeds when a self-managing host can move from scattered property o
 It tells the project story in this order:
 
 **Problem → product → architecture → why multi-agent → real scenario → HITL → failures → LLM decision → evaluation → tech.**
-
