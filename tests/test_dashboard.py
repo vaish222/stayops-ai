@@ -159,6 +159,30 @@ def test_ask_stayops_uses_new_thread_without_replacing_daily_portfolio() -> None
     assert len(build_property_summaries(controller.daily_result)) == 8
 
 
+def test_dashboard_date_refresh_preserves_latest_query_and_answer_scope() -> None:
+    thread_ids = iter(["daily-aug-28", "query-aug-29", "daily-aug-30"])
+    controller = DashboardController(
+        reference_date=REFERENCE_DATE,
+        thread_id_factory=lambda: next(thread_ids),
+        runtime_store=SimulatedOperationsStore(
+            Path(mkdtemp(prefix="stayops-date-separation-test-"))
+        ),
+    )
+    controller.load_daily_briefing(REFERENCE_DATE)
+    query = "Who is checking in tomorrow?"
+    query_result = controller.run_query(query)
+
+    controller.load_daily_briefing(date(2026, 8, 30))
+
+    assert controller.daily_result is not None
+    assert controller.daily_result["date_scope"] == "2026-08-30"
+    assert controller.result is query_result
+    assert controller.result["date_scope"] == "2026-08-29"
+    assert controller.last_query == query
+    assert controller.thread_id == "query-aug-29"
+    assert controller.has_user_query is True
+
+
 def test_user_query_stream_reports_live_activity_and_final_state() -> None:
     controller = deterministic_controller()
     activity_snapshots: list[dict[str, ActivityStatus]] = []

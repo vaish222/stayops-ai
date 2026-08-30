@@ -45,13 +45,15 @@ def render_app(view: str | None = None) -> AppTest:
 
 
 class FailureOnlyDashboardController(DashboardController):
-    def load_daily_briefing(self) -> dict:
+    def load_daily_briefing(self, dashboard_date: date | None = None) -> dict:
+        target_date = dashboard_date or self.reference_date or REFERENCE_DATE
         result = self.run_query(
-            "Are there unresolved guest issues today?",
+            f"Are there unresolved guest issues on {target_date.isoformat()}?",
             user_initiated=False,
         )
         self.daily_result = result
         self.daily_thread_id = self.thread_id
+        self.daily_config = self.config
         return result
 
 
@@ -161,6 +163,100 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     assert sum("Simulation mode:" in item.value for item in app.caption) == 1
     assert "Edit" not in {button.label for button in app.button}
     assert len(app.text_area) == 0
+
+
+def test_dashboard_date_selector_labels_every_date_bound_section() -> None:
+    app = render_app()
+
+    assert app.exception == []
+    assert app.date_input(key="dashboard_date").value == REFERENCE_DATE
+    assert {button.label for button in app.button} >= {
+        "Previous",
+        "Today",
+        "Next",
+    }
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Viewing operations for" in page_markup
+    assert "Today · Aug 28" in page_markup
+    assert "Operations snapshot · Today · Aug 28" in page_markup
+    assert "Needs Your Attention — Today · Aug 28" in page_markup
+    assert "Portfolio Overview — Today · Aug 28" in page_markup
+    assert "Today&#x27;s readiness across all 8 properties." in page_markup
+    assert "Today · Aug 28 · Today&#x27;s operations" in page_markup
+    assert any(
+        "Operating date · Today · Aug 28" in caption.value
+        for caption in app.caption
+    )
+    approval_headers = [
+        item.value
+        for item in app.markdown
+        if item.value.startswith('<div class="approval-property-header">')
+    ]
+    assert approval_headers
+    assert all("Today · Aug 28" in header for header in approval_headers)
+
+
+def test_next_today_and_calendar_controls_refresh_dashboard_scope() -> None:
+    app = render_app()
+
+    app = app.button(key="dashboard_date_next").click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert app.session_state["dashboard_date"] == date(2026, 8, 29)
+    assert controller.daily_result["date_scope"] == "2026-08-29"
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Tomorrow · Aug 29" in page_markup
+    assert "Arrivals Tomorrow" in page_markup
+    assert "Tomorrow&#x27;s readiness across all 8 properties." in page_markup
+
+    app = app.date_input(key="dashboard_date").set_value(
+        date(2026, 8, 30)
+    ).run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert controller.daily_result["date_scope"] == "2026-08-30"
+    assert "Aug 30" in "\n".join(item.value for item in app.markdown)
+
+    app = app.button(key="dashboard_date_today").click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert app.session_state["dashboard_date"] == REFERENCE_DATE
+    assert controller.daily_result["date_scope"] == "2026-08-28"
+
+
+def test_query_date_stays_separate_until_user_switches_dashboard() -> None:
+    app = render_app()
+    query = "Who is checking in tomorrow?"
+    app.text_input[0].input(query)
+
+    app = app.button(key="FormSubmitter:ask_stayops-Ask StayOps").click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    query_result = controller.result
+    assert controller.daily_result["date_scope"] == "2026-08-28"
+    assert query_result["date_scope"] == "2026-08-29"
+    assert app.session_state["dashboard_date"] == REFERENCE_DATE
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Looking ahead to Tomorrow · Aug 29" in page_markup
+    assert "Needs Your Attention — Today · Aug 28" in page_markup
+    assert app.button(key="switch_to_query_date").label == (
+        "View Tomorrow · Aug 29 operations →"
+    )
+
+    app = app.button(key="switch_to_query_date").click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert app.session_state["dashboard_date"] == date(2026, 8, 29)
+    assert controller.daily_result["date_scope"] == "2026-08-29"
+    assert controller.result is query_result
+    assert controller.last_query == query
+    assert controller.has_user_query is True
+    assert "switch_to_query_date" not in {button.key for button in app.button}
 
 
 def test_approval_actions_are_grouped_by_property_in_priority_order() -> None:

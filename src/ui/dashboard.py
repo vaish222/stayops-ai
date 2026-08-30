@@ -239,6 +239,7 @@ class DashboardController:
             lambda: f"stayops-ui-{uuid4()}"
         )
         self.daily_result: dict[str, Any] | None = None
+        self.daily_config: dict[str, Any] | None = None
         self.result: dict[str, Any] | None = None
         self.config: dict[str, Any] | None = None
         self.thread_id: str | None = None
@@ -249,20 +250,56 @@ class DashboardController:
         self.activity_running: bool = False
         self._selected_activity_specialists: set[str] = set()
 
-    def load_daily_briefing(self) -> dict[str, Any]:
-        result = self.run_query(DEFAULT_DAILY_QUERY, user_initiated=False)
+    def load_daily_briefing(
+        self,
+        dashboard_date: date | None = None,
+    ) -> dict[str, Any]:
+        """Refresh dashboard data without replacing an active user answer."""
+
+        target_date = (
+            dashboard_date
+            or self.reference_date
+            or current_operating_date()
+        )
+        dashboard_query = (
+            f"What needs my attention on {target_date.isoformat()}?"
+        )
+        preserve_active_query = self.has_user_query
+        active_state = (
+            self.result,
+            self.config,
+            self.thread_id,
+            self.last_query,
+            self.has_user_query,
+        )
+        result = self.run_query(dashboard_query, user_initiated=False)
         self.daily_result = result
         self.daily_thread_id = self.thread_id
+        self.daily_config = self.config
+        if preserve_active_query:
+            (
+                self.result,
+                self.config,
+                self.thread_id,
+                self.last_query,
+                self.has_user_query,
+            ) = active_state
         return result
+
+    def daily_briefing_needs_refresh_for(self, expected_date: date) -> bool:
+        """Return whether dashboard data belongs to another selected date."""
+
+        return (
+            self.daily_result is None
+            or self.daily_result.get("date_scope") != expected_date.isoformat()
+        )
 
     @property
     def daily_briefing_needs_refresh(self) -> bool:
         """Return whether a dynamic dashboard briefing belongs to an older day."""
 
-        if self.daily_result is None:
-            return True
         expected_date = self.reference_date or current_operating_date()
-        return self.daily_result.get("date_scope") != expected_date.isoformat()
+        return self.daily_briefing_needs_refresh_for(expected_date)
 
     def run_query(
         self,

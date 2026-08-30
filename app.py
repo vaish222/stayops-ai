@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from html import escape
 from typing import Any
 
@@ -13,13 +13,18 @@ from src.agents.response_generator import format_stayops_response
 from src.time_context import current_operating_date
 from src.ui import (
     ActivityStatus,
-    DEFAULT_DAILY_QUERY,
     DashboardController,
     PropertyHealth,
     build_property_summaries,
     count_property_health,
     evidence_for_action,
+    format_answer_date_context,
+    format_date_context,
+    format_scope_context,
     incomplete_analysis_message,
+    operations_copy,
+    readiness_copy,
+    single_date_from_scope,
 )
 
 
@@ -115,6 +120,22 @@ def _install_theme() -> None:
         .status-card.blue { background:#f7fafd; border-top:4px solid #6e9bbd; }
         .status-card .value { font-size:1.6rem; line-height:1.1; font-weight:800; color:var(--navy); }
         .status-card .label { color:var(--muted); font-size:.78rem; font-weight:700; margin-top:.24rem; }
+        .st-key-dashboard_date_selector {
+            background:#f7fbf9; border-color:#c9ddd6; border-radius:15px;
+            margin:.2rem 0 1rem; padding:.75rem .85rem;
+        }
+        .dashboard-date-kicker {
+            color:var(--teal-dark); font-size:.67rem; font-weight:850;
+            letter-spacing:.11em; text-transform:uppercase;
+        }
+        .dashboard-date-value { color:var(--navy); font-size:1.02rem; font-weight:820; margin-top:.12rem; }
+        .metric-date-context {
+            color:var(--teal-dark); font-size:.73rem; font-weight:820;
+            letter-spacing:.08em; text-transform:uppercase; margin:.2rem 0 .5rem;
+        }
+        .answer-date-context {
+            color:var(--teal-dark); font-size:.88rem; font-weight:780; margin:-.2rem 0 .75rem;
+        }
         [data-testid="stMetric"] {
             background: var(--card);
             border: 1px solid var(--line);
@@ -164,6 +185,7 @@ def _install_theme() -> None:
             border-radius:11px; padding:.72rem .82rem; margin-bottom:.9rem;
         }
         .approval-property-name { color:var(--navy); font-size:1.16rem; font-weight:840; }
+        .approval-property-context { color:var(--teal-dark); font-size:.76rem; font-weight:760; margin-top:.12rem; }
         .approval-property-count {
             color:#fff; background:var(--teal-dark); border-radius:999px;
             font-size:.72rem; font-weight:800; padding:.25rem .6rem; white-space:nowrap;
@@ -265,13 +287,81 @@ def _install_theme() -> None:
     )
 
 
+def _today_for(controller: DashboardController) -> date:
+    return controller.reference_date or current_operating_date()
+
+
+def _dashboard_date(controller: DashboardController) -> date:
+    if "dashboard_date" not in st.session_state:
+        st.session_state.dashboard_date = _today_for(controller)
+    selected = st.session_state.dashboard_date
+    if isinstance(selected, datetime):
+        selected = selected.date()
+        st.session_state.dashboard_date = selected
+    return selected
+
+
 def _controller() -> DashboardController:
     if "stayops_controller" not in st.session_state:
         st.session_state.stayops_controller = DashboardController()
     controller: DashboardController = st.session_state.stayops_controller
-    if controller.daily_briefing_needs_refresh:
-        controller.load_daily_briefing()
+    dashboard_date = _dashboard_date(controller)
+    if controller.daily_briefing_needs_refresh_for(dashboard_date):
+        controller.load_daily_briefing(dashboard_date)
     return controller
+
+
+def _set_dashboard_date(value: date) -> None:
+    st.session_state.dashboard_date = value
+
+
+def _shift_dashboard_date(days: int) -> None:
+    selected = st.session_state.get("dashboard_date", current_operating_date())
+    if isinstance(selected, datetime):
+        selected = selected.date()
+    st.session_state.dashboard_date = selected + timedelta(days=days)
+
+
+def _render_dashboard_date_selector(
+    dashboard_date: date,
+    today: date,
+) -> None:
+    with st.container(border=True, key="dashboard_date_selector"):
+        label_column, previous_column, today_column, next_column, picker_column = (
+            st.columns([2.25, .72, .72, .72, 1.25], vertical_alignment="center")
+        )
+        label_column.markdown(
+            '<div class="dashboard-date-kicker">Viewing operations for</div>'
+            '<div class="dashboard-date-value">'
+            f'{escape(format_date_context(dashboard_date, today))}</div>',
+            unsafe_allow_html=True,
+        )
+        previous_column.button(
+            "Previous",
+            key="dashboard_date_previous",
+            on_click=_shift_dashboard_date,
+            args=(-1,),
+            width="stretch",
+        )
+        today_column.button(
+            "Today",
+            key="dashboard_date_today",
+            on_click=_set_dashboard_date,
+            args=(today,),
+            width="stretch",
+        )
+        next_column.button(
+            "Next",
+            key="dashboard_date_next",
+            on_click=_shift_dashboard_date,
+            args=(1,),
+            width="stretch",
+        )
+        picker_column.date_input(
+            "Choose date",
+            key="dashboard_date",
+            label_visibility="collapsed",
+        )
 
 
 def _requested_view() -> str:
@@ -415,9 +505,11 @@ def _plain_evidence_lines(
         for record in records:
             if source == "reservations":
                 lines.append(
-                    f"{record['guest_name']}: check-in {record['check_in_date']} at "
+                    f"{record['guest_name']}: check-in "
+                    f"{_format_date(record['check_in_date'])} at "
                     f"{_format_time(record.get('check_in_time'))}; check-out "
-                    f"{record['check_out_date']} at {_format_time(record.get('check_out_time'))}."
+                    f"{_format_date(record['check_out_date'])} at "
+                    f"{_format_time(record.get('check_out_time'))}."
                 )
             elif source == "guest_messages":
                 lines.append(
@@ -654,7 +746,11 @@ def _attention_copy(finding: dict[str, Any], result: dict[str, Any]) -> tuple[st
     return finding["summary"], "Review and handle this issue."
 
 
-def _render_attention(result: dict[str, Any]) -> None:
+def _render_attention(
+    result: dict[str, Any],
+    dashboard_date: date,
+    today: date,
+) -> None:
     findings = _urgent_findings(result)
     summaries = build_property_summaries(result)
     watch_count = sum(summary.health == PropertyHealth.WATCH for summary in summaries)
@@ -666,7 +762,7 @@ def _render_attention(result: dict[str, Any]) -> None:
     )
     _section_heading(
         "needs-attention",
-        "Needs Your Attention",
+        f"Needs Your Attention — {format_date_context(dashboard_date, today)}",
         f"{len(findings)} {action_noun} action{watch_copy}",
     )
     if not findings:
@@ -696,6 +792,8 @@ def _render_attention(result: dict[str, Any]) -> None:
 
 def _render_ask_stayops(
     controller: DashboardController,
+    dashboard_date: date,
+    today: date,
     activity_slot: Any | None = None,
 ) -> None:
     _section_heading(
@@ -726,12 +824,13 @@ def _render_ask_stayops(
         if column.button(label, key=f"quick_prompt_{label}", width="stretch"):
             _run_query(controller, prompt, activity_slot)
     _show_notice()
-    _render_stayops_answer(controller)
+    _render_stayops_answer(controller, dashboard_date, today)
 
 
 def _property_card_details(
     result: dict[str, Any],
     property_id: str,
+    today: date,
 ) -> tuple[str, str, str]:
     reservations = sorted(
         (
@@ -752,15 +851,21 @@ def _property_card_details(
         for item in reservations
         if item.get("check_out_date") == result.get("date_scope")
     ]
+    operating_date = single_date_from_scope(result.get("date_scope"))
+    date_label = (
+        format_date_context(operating_date, today)
+        if operating_date is not None
+        else "Selected date"
+    )
     next_arrival = (
-        f"Today, {_format_time(arrivals[0].get('check_in_time'))}"
+        f"{date_label}, {_format_time(arrivals[0].get('check_in_time'))}"
         if arrivals
-        else "No arrival today"
+        else f"No arrival · {date_label}"
     )
     next_departure = (
-        f"Today, {_format_time(departures[0].get('check_out_time'))}"
+        f"{date_label}, {_format_time(departures[0].get('check_out_time'))}"
         if departures
-        else "No departure today"
+        else f"No departure · {date_label}"
     )
     cleanings = [
         item
@@ -788,6 +893,7 @@ def _render_portfolio_cards(
     summaries,
     result: dict[str, Any],
     status_filter: str,
+    today: date,
 ) -> None:
     visible = [
         summary
@@ -800,7 +906,9 @@ def _render_portfolio_cards(
     columns = st.columns(2)
     for index, summary in enumerate(visible):
         arrival, departure, operations = _property_card_details(
-            result, summary.property_id
+            result,
+            summary.property_id,
+            today,
         )
         with columns[index % 2]:
             with st.container(border=True):
@@ -814,7 +922,8 @@ def _render_portfolio_cards(
                     f'<div><strong>Departure</strong>{escape(departure)}</div>'
                     f'<div><strong>Property ops</strong>{escape(operations)}</div>'
                     '</div>'
-                    f'<div class="detail-line">{escape(summary.headline)}</div>'
+                    '<div class="detail-line">'
+                    f'{escape(_humanize_embedded_dates(summary.headline))}</div>'
                     '</div>',
                     unsafe_allow_html=True,
                 )
@@ -945,7 +1054,8 @@ def _render_priorities(
                     f"{prop.get('name', finding['property_id'])}"
                 )
                 st.markdown(
-                    f'<div class="issue-title">{escape(finding["summary"])}</div>',
+                    '<div class="issue-title">'
+                    f'{escape(_humanize_embedded_dates(finding["summary"]))}</div>',
                     unsafe_allow_html=True,
                 )
             with right:
@@ -1099,11 +1209,14 @@ def _render_operations_views(
     result: dict[str, Any],
     property_id: str | None,
     requested_view: str,
+    dashboard_date: date,
+    today: date,
 ) -> None:
     _section_heading(
         "operations-workspace",
         "Operations Workspace",
-        "See the operational details behind every StayOps alert.",
+        f"{format_date_context(dashboard_date, today)} · "
+        f"{operations_copy(dashboard_date, today)}",
     )
     tab_labels = list(OPERATIONS_VIEW_TO_TAB.values())
     requested_tab = OPERATIONS_VIEW_TO_TAB.get(
@@ -1359,6 +1472,10 @@ def _render_review(
         "Simulation mode: no external message is sent. Approved changes are saved "
         "to the local demo runtime and reflected in these screens."
     )
+    approval_date = format_scope_context(
+        result.get("date_scope"),
+        _today_for(controller),
+    )
     for property_id, property_actions in _group_approval_actions(actions):
         property_name = _property_name(result, property_id)
         action_count = len(property_actions)
@@ -1368,9 +1485,17 @@ def _render_review(
             else f"{action_count} actions need your approval"
         )
         with st.container(border=True):
+            date_markup = (
+                '<div class="approval-property-context">'
+                f'{escape(approval_date)}</div>'
+                if result.get("date_scope")
+                else ""
+            )
             st.markdown(
                 '<div class="approval-property-header">'
+                '<div>'
                 f'<div class="approval-property-name">{escape(property_name)}</div>'
+                f'{date_markup}</div>'
                 f'<div class="approval-property-count">{escape(count_label)}</div>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -1397,9 +1522,16 @@ def _stayops_answer(controller: DashboardController) -> str:
     return format_stayops_response(result)
 
 
-def _render_stayops_answer(controller: DashboardController) -> None:
+def _render_stayops_answer(
+    controller: DashboardController,
+    dashboard_date: date,
+    today: date,
+) -> None:
     if not controller.has_user_query:
         return
+    result = controller.result or {}
+    query_scope = result.get("date_scope")
+    query_date = single_date_from_scope(query_scope)
     with st.container(border=True, key="stayops_answer"):
         st.markdown('<div id="stayops-answer"></div>', unsafe_allow_html=True)
         st.markdown("### ✨ StayOps Answer")
@@ -1412,7 +1544,20 @@ def _render_stayops_answer(controller: DashboardController) -> None:
                 '</div>',
                 unsafe_allow_html=True,
             )
+        st.markdown(
+            '<div class="answer-date-context">'
+            f'{escape(format_answer_date_context(query_scope, today))}</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(_stayops_answer(controller))
+        if query_date is not None and query_date != dashboard_date:
+            st.button(
+                f"View {format_date_context(query_date, today)} operations →",
+                key="switch_to_query_date",
+                type="primary",
+                on_click=_set_dashboard_date,
+                args=(query_date,),
+            )
 
 
 def _render_agent_activity(
@@ -1490,17 +1635,32 @@ def _render_dashboard_content(
     counts: dict[PropertyHealth, int],
     property_names: dict[str, Any],
     selected_name: str,
+    dashboard_date: date,
+    today: date,
     activity_slot: Any,
 ) -> None:
     """Render the selected workspace beside the persistent activity rail."""
 
+    _render_dashboard_date_selector(dashboard_date, today)
+
     if requested_view == "command_center":
+        arrivals_label = (
+            "Arrivals Today"
+            if dashboard_date == today
+            else "Arrivals Tomorrow"
+            if dashboard_date == today + timedelta(days=1)
+            else "Arrivals Yesterday"
+            if dashboard_date == today - timedelta(days=1)
+            else "Arrivals"
+        )
         st.markdown(
+            '<div class="metric-date-context">Operations snapshot · '
+            f'{escape(format_date_context(dashboard_date, today))}</div>'
             '<div class="status-grid">'
             f'<div class="status-card coral"><div class="value">{counts[PropertyHealth.NEEDS_ATTENTION]}</div><div class="label">Needs Action</div></div>'
             f'<div class="status-card amber"><div class="value">{counts[PropertyHealth.WATCH]}</div><div class="label">Watch</div></div>'
             f'<div class="status-card mint"><div class="value">{counts[PropertyHealth.READY]}</div><div class="label">Ready for Guests</div></div>'
-            f'<div class="status-card blue"><div class="value">{_arrivals_today(daily_result)}</div><div class="label">Arrivals Today</div></div>'
+            f'<div class="status-card blue"><div class="value">{_arrivals_today(daily_result)}</div><div class="label">{escape(arrivals_label)}</div></div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -1510,8 +1670,13 @@ def _render_dashboard_content(
         st.error(daily_warning, icon="⚠️")
 
     if requested_view == "command_center":
-        _render_attention(daily_result)
-        _render_ask_stayops(controller, activity_slot)
+        _render_attention(daily_result, dashboard_date, today)
+        _render_ask_stayops(
+            controller,
+            dashboard_date,
+            today,
+            activity_slot,
+        )
 
     selected_summary = property_names.get(selected_name)
     selected_property_id = (
@@ -1521,8 +1686,8 @@ def _render_dashboard_content(
         if selected_summary is None:
             _section_heading(
                 "portfolio",
-                "Portfolio Overview",
-                "Scan readiness, arrivals, departures, and active property work.",
+                f"Portfolio Overview — {format_date_context(dashboard_date, today)}",
+                readiness_copy(dashboard_date, today, len(summaries)),
             )
             status_filter = st.radio(
                 "Portfolio status",
@@ -1531,7 +1696,12 @@ def _render_dashboard_content(
                 label_visibility="collapsed",
                 key="portfolio_filter",
             )
-            _render_portfolio_cards(summaries, daily_result, status_filter)
+            _render_portfolio_cards(
+                summaries,
+                daily_result,
+                status_filter,
+                today,
+            )
         else:
             st.markdown('<div id="portfolio"></div>', unsafe_allow_html=True)
             _render_property_drilldown(daily_result, selected_summary)
@@ -1541,6 +1711,8 @@ def _render_dashboard_content(
             daily_result,
             selected_property_id,
             requested_view,
+            dashboard_date,
+            today,
         )
         _render_review(controller, activity_slot)
     elif requested_view in OPERATIONS_VIEW_TO_TAB:
@@ -1548,6 +1720,8 @@ def _render_dashboard_content(
             daily_result,
             selected_property_id,
             requested_view,
+            dashboard_date,
+            today,
         )
     elif requested_view == "approvals":
         _render_review(controller, activity_slot)
@@ -1563,6 +1737,8 @@ def main() -> None:
     _install_theme()
     requested_view = _requested_view()
     controller = _controller()
+    today = _today_for(controller)
+    dashboard_date = _dashboard_date(controller)
     daily_result = controller.daily_result or {}
     summaries = build_property_summaries(daily_result)
     counts = count_property_health(summaries)
@@ -1597,8 +1773,7 @@ def main() -> None:
             key="property_drilldown",
         )
         st.caption(
-            f"Operating date · "
-            f"{_format_date(daily_result.get('date_scope') or current_operating_date().isoformat())}"
+            f"Operating date · {format_date_context(dashboard_date, today)}"
         )
         st.markdown("---")
         st.caption("Synthetic operations data · simulated writes only")
@@ -1617,6 +1792,8 @@ def main() -> None:
             counts=counts,
             property_names=property_names,
             selected_name=selected_name,
+            dashboard_date=dashboard_date,
+            today=today,
             activity_slot=activity_slot,
         )
 
