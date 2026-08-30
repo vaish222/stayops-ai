@@ -229,6 +229,42 @@ uv run streamlit run app.py
 
 Never commit API keys to the repository.
 
+# LLM Synthesizer Comparison
+
+StayOps was evaluated with deterministic synthesis, local Ollama synthesis,
+and hosted Nebius synthesis. Each option ran the same nine controlled scenarios
+five times. Eight scenarios invoke the synthesizer, producing 40 synthesis runs
+per option.
+
+| Synthesizer | Model | Native completion | Fallback rate | Grounding failure rate | Average synthesis latency | p95 synthesis latency |
+| ----------- | ----- | ----------------: | ------------: | ---------------------: | ------------------------: | --------------------: |
+| Deterministic | N/A | 100% | 0% | 0% | 0.12 ms | 0.16 ms |
+| Nebius | `Qwen/Qwen3-235B-A22B-Instruct-2507` | 62.5% | 37.5% | 37.5% | 2.67 s | 5.51 s |
+| Ollama | `mistral:latest` | 37.5% | 62.5% | 62.5% | 5.76 s | 13.04 s |
+
+All three options recorded a 100% scenario pass rate because the configured
+deterministic fallback safely completed workflows when an LLM response failed
+strict grounding validation. For that reason, native completion and fallback
+rates are more useful than the overall pass rate when comparing providers.
+
+For the currently tested models, deterministic synthesis is the recommended
+default. Nebius is the stronger LLM candidate, but its grounding failures need
+to be reduced before relying on it without fallback. The tested Ollama model
+was slower and required fallback more often. These latency measurements reflect
+the machine and network used for this benchmark and should not be treated as
+universal provider performance.
+
+The complete report is available at
+[`evaluation/results/provider_comparison/comparison_report.json`](evaluation/results/provider_comparison/comparison_report.json).
+Reproduce the comparison with:
+
+```bash
+set -a
+source .env
+set +a
+uv run python -m src.evaluation.provider_comparison --runs 5
+```
+
 # Running Tests
 
 uv run pytest
@@ -245,5 +281,4 @@ StayOps AI succeeds when a self-managing host can move from scattered property o
 It tells the project story in this order:
 
 **Problem → product → architecture → why multi-agent → real scenario → HITL → failures → LLM decision → evaluation → tech.**
-
 
