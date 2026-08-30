@@ -229,33 +229,67 @@ Unavailable source data is never treated as an all-clear. Persistent read failur
 
 ## Running Locally
 
+### Prerequisites
+
+- Python 3.12 or newer
+- [`uv`](https://docs.astral.sh/uv/)
+- Ollama running locally only when using the Ollama provider
+
+Install the project dependencies:
+
+```bash
 uv sync
+```
+
+StayOps uses deterministic synthesis by default, so no LLM credentials are required for the standard local run:
 
 ### Run StayOps with deterministic synthesis
 
-SYNTHESIZER_MODE=deterministic uv run streamlit run app.py
+```bash
+uv run streamlit run app.py
+```
+
+The operating timezone is controlled by `STAYOPS_TIMEZONE` and defaults to `America/Los_Angeles`. Override it when needed:
+
+```bash
+STAYOPS_TIMEZONE=America/New_York uv run streamlit run app.py
+```
+
+### Load configuration from `.env`
+
+The application does not automatically load `.env`. Export its values into the shell before starting StayOps:
+
+```bash
+set -a
+source .env
+set +a
+uv run streamlit run app.py
+```
 
 ### Run with Ollama
 
 Make sure Ollama is running and the configured model is available.
 
-SYNTHESIZER_MODE=llm
-LLM_PROVIDER=ollama
-LLM_MODEL=<your-model>
-
+```bash
+SYNTHESIZER_MODE=llm \
+LLM_PROVIDER=ollama \
+LLM_MODEL=mistral:latest \
+OLLAMA_BASE_URL=http://localhost:11434 \
 uv run streamlit run app.py
+```
 
 ### Run with Nebius
 
-Configure the required environment variables:
+`NEBIUS_API_KEY` is the preferred credential name for Nebius. `LLM_API_KEY` remains supported as a compatibility fallback.
 
-SYNTHESIZER_MODE=llm
-LLM_PROVIDER=nebius
-LLM_MODEL=<your-model>
-LLM_API_KEY=<your-key>
-LLM_BASE_URL=<configured-nebius-endpoint>
-
+```bash
+SYNTHESIZER_MODE=llm \
+LLM_PROVIDER=nebius \
+LLM_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507 \
+NEBIUS_API_KEY="replace-with-nebius-api-key" \
+LLM_BASE_URL=https://api.tokenfactory.nebius.com/v1/ \
 uv run streamlit run app.py
+```
 
 Never commit API keys to the repository.
 
