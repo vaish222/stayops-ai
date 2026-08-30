@@ -278,6 +278,7 @@ def test_maintenance_agent_connects_blocking_ticket_to_supplied_upcoming_stay() 
     assert evidence_by_source[EvidenceSource.RESERVATIONS].record_ids == [
         "res_pine_002",
         "res_pine_003",
+        "res_pine_004",
     ]
 
 
@@ -299,7 +300,11 @@ def test_maintenance_agent_keeps_nonblocking_vacant_issue_at_source_severity() -
 
 
 def test_maintenance_agent_does_not_reopen_resolved_ticket() -> None:
-    tickets = items(get_maintenance_tickets(["prop_lake_house"]))
+    tickets = [
+        ticket
+        for ticket in items(get_maintenance_tickets(["prop_lake_house"]))
+        if ticket.id == "maint_lake_001"
+    ]
 
     output = MaintenanceAgent().invoke(
         {
@@ -311,7 +316,7 @@ def test_maintenance_agent_does_not_reopen_resolved_ticket() -> None:
     )
 
     assert output.findings == []
-    assert output.analyzed_record_ids == ["maint_lake_001", "maint_lake_002"]
+    assert output.analyzed_record_ids == ["maint_lake_001"]
 
 
 def test_source_failure_warns_and_prevents_unsupported_findings() -> None:

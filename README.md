@@ -1,438 +1,249 @@
-# StayOps AI
+# StayOps AI 🏡
+### Multi-Agent Operations Manager for Short-Term Rental Hosts
 
-StayOps AI is a multi-agent operations assistant for a self-managing
-short-term-rental host. It coordinates booking, guest communication, turnover,
-and maintenance analysis across eight fictional properties and presents one
-prioritized Streamlit dashboard.
+> **8 properties. One operations command center. Know what's ready, what's at risk, and what needs your approval.**
 
-Routine reads and analysis run automatically. Consequential actions—sending a
-message or updating an operational record—require explicit host approval and
-are simulated only.
+StayOps AI is a multi-agent operations system built for a self-managing short-term rental host managing eight properties.
 
-## Current status
+Instead of manually checking reservations, guest messages, cleaning schedules, and maintenance issues across multiple properties, StayOps coordinates specialized agents to answer a much simpler question:
 
-StayOps AI V1 is implemented end to end. The current build includes the linked
-eight-property dataset, typed read tools, intent and date routing, conditional
-parallel specialists, operations synthesis, deterministic safety checks,
-LangGraph human review, approval-protected simulated writes, intent-aware
-answers, the polished Streamlit command center, and the evaluation harness.
-Operations synthesis can run in the deterministic baseline mode or through a
-provider-neutral structured-output LLM adapter for Nebius or local Ollama.
+> **What needs my attention right now?**
 
-As of August 29, 2026:
+The system autonomously reads operational data, routes work to specialized agents, combines their findings into a prioritized briefing, and pauses for human approval before any consequential action is taken.
 
-- all **223 automated tests pass**;
-- all **9 evaluation scenarios pass** and every aggregate target is met;
-- routing, specialist activation, priority/risk accuracy, approval enforcement,
-  and safe failure handling score `1.0` in the saved deterministic evaluation;
-- unsupported critical claims score `0`; and
-- external messages and production-system writes remain intentionally disabled.
+---
 
-## System architecture
+## Why I Built This
 
-The application uses LangGraph for orchestration and LangChain runnables with
-Pydantic contracts for validated component boundaries.
+Managing multiple short-term rentals is not just a data lookup problem.
+
+A host may need to simultaneously understand:
+
+- Who is checking in or out today?
+- Is each property ready for the next guest?
+- Has the cleaner confirmed?
+- Is a guest waiting for a response?
+- Could an open maintenance issue affect an upcoming stay?
+- Which issue should be handled first?
+- Which properties require no action?
+
+The information may already exist, but the host still has to connect the dots.
+
+StayOps AI turns those scattered operational signals into:
+
+**Read → Analyze → Prioritize → Escalate → Human Approve → Act**
+
+---
+
+## What StayOps Can Do
+
+StayOps currently manages four operational areas across eight synthetic properties:
+
+### 📅 Booking Operations
+- Today's arrivals and departures
+- Upcoming reservations
+- Same-day turnovers
+- Occupancy and booking conflicts
+
+### 💬 Guest Operations
+- Unanswered messages
+- Guest requests
+- Complaints
+- Maintenance reports
+- Communication urgency
+
+### 🧹 Turnover Operations
+- Cleaner assignments
+- Cleaning confirmation
+- Checkout → cleaning → next check-in timing
+- Turnover readiness risk
+
+### 🔧 Maintenance Operations
+- Open maintenance tickets
+- Severity
+- Current guest impact
+- Upcoming reservation impact
+
+---
+
+# Project Structure
+
+stayops-ai/
+│
+├── app.py
+├── pyproject.toml
+├── README.md
+├── .env.example
+│
+├── data/
+│
+├── src/
+│   ├── agents/
+│   ├── config/
+│   ├── evaluation/
+│   ├── graph/
+│   ├── llm/
+│   ├── models/
+│   ├── safety/
+│   ├── tools/
+│   └── ui/
+│
+├── evaluation/
+└── tests/
+
+---
+
+# Architecture
+
+StayOps is built as a stateful LangGraph workflow rather than a single LLM call.
 
 ```text
-Host request
-    |
-Request router
-    |
-Context loader
-    |
-    +--> Booking specialist --------+
-    +--> Guest specialist ----------+
-    +--> Turnover specialist -------+--> Operations synthesizer
-    +--> Maintenance specialist ----+             |
-                                              Risk/action gate
-                                                /          \
-                                        Safe response    Human review
-                                                           /   |   \
-                                                     Approve  Edit  Reject
-                                                        |             |
-                                                Protected executor    |
-                                                        \             /
-                                                   Response generator
+                         HOST
+                          │
+                          ▼
+                   STREAMLIT UI
+                          │
+                          ▼
+                DETERMINISTIC ROUTER
+                          │
+                          ▼
+                    CONTEXT LOADER
+                          │
+             ┌────────────┼────────────┐
+             │            │            │
+             ▼            ▼            ▼
+          BOOKING       GUEST       TURNOVER
+           AGENT        AGENT         AGENT
+             │            │            │
+             └────────────┼────────────┐
+                          │            │
+                          ▼            ▼
+                    MAINTENANCE AGENT
+                          │
+                          ▼
+                OPERATIONS SYNTHESIZER
+                   Deterministic / LLM
+                          │
+                          ▼
+                 DETERMINISTIC SAFETY
+                    /             \
+                   /               \
+             READ ONLY          ACTION
+                 │                 │
+                 ▼                 ▼
+              RESPONSE       HUMAN REVIEW
+                                  │
+                           Approve/Edit/Reject
+                                  │
+                                  ▼
+                         PROTECTED WRITE TOOL
+                                  │
+                                  ▼
+                               RESPONSE
+
+```
+<img width="1536" height="1024" alt="ChatGPT Image Aug 28, 2026, 09_47_01 PM" src="https://github.com/user-attachments/assets/b4d64be6-45f5-469b-abf1-6fcad5c46a6e" />
+
+---
+
+# Failure Handling
+
+A multi-agent system should not work only on the happy path.
+StayOps read tools support controlled failure simulation.
+
+```text
+Tool Call
+    │
+    ▼
+ Success?
+  /      \
+Yes       No
+ │         │
+Continue  Retry once
+            │
+            ▼
+         Success?
+         /     \
+       Yes      No
+        │        │
+    Continue   Record error
+                 │
+                 ▼
+          Can analysis continue?
+             /          \
+           Yes           No
+            │             │
+      Partial result   Human review
+
 ```
 
-The graph loads only the sources required by the routed intent. Broad briefing
-and risk requests run all four specialists concurrently, while domain-specific
-requests use the smallest useful specialist set. Every completed path converges
-on the response generator so the host-facing narrative reflects the actual
-review and execution outcome.
+---
 
-## Synthetic operational data
+# Tech Stack
 
-Six linked JSON fixtures live in `data/`:
+| Layer              | Technology             |
+| ------------------ | ---------------------- |
+| Language           | Python                 |
+| Agent Framework    | LangChain              |
+| Orchestration      | LangGraph              |
+| Validation         | Pydantic               |
+| Hosted LLM         | Nebius                 |
+| Local LLM          | Ollama                 |
+| UI                 | Streamlit              |
+| Package Management | uv                     |
+| Testing            | pytest                 |
+| Data               | Synthetic JSON         |
+| Persistence        | LangGraph checkpointer |
 
-- `properties.json`
-- `property_rules.json`
-- `reservations.json`
-- `guest_messages.json`
-- `cleaning_schedule.json`
-- `maintenance_tickets.json`
+---
 
-The fixtures currently contain 8 properties, 8 property-rule records, 21
-reservations, 17 guest messages, 16 cleaning jobs, and 14 maintenance tickets.
-Strict Pydantic models validate every record, and every fixture is explicitly
-marked as synthetic.
+# Running Locally
 
-The dashboard resolves calendar language against the current date in
-`America/Los_Angeles`, overridable with `STAYOPS_TIMEZONE`. It understands
-`today`, `tomorrow`, `yesterday`, day-before/day-after phrases, named weekdays,
-`this`/`next`/`last` weekday or weekend scopes, upcoming periods, and explicit
-ISO dates or ranges. The daily dashboard automatically refreshes after a local
-calendar-day rollover. Tests and evaluation scenarios inject a fixed reference
-date to remain deterministic.
+uv sync
 
-The dataset includes same-day turnovers, an unconfirmed cleaner, unanswered
-guest messages, guest-impacting and non-blocking maintenance, an early check-in
-request, future arrivals, vacant properties, and routine properties that need
-no attention.
+# Run StayOps with deterministic synthesis
 
-## Read tools and context loading
+SYNTHESIZER_MODE=deterministic uv run streamlit run app.py
 
-The `src/tools/` package exposes six read-only functions:
+# Run with Ollama
 
-- `get_properties()`
-- `get_property_rules()`
-- `get_reservations()`
-- `get_guest_messages()`
-- `get_cleaning_schedule()`
-- `get_maintenance_tickets()`
+Make sure Ollama is running and the configured model is available.
 
-Each function returns a typed `ReadResult` instead of raising operational data
-errors. Tools support property filtering, while dated sources support inclusive
-date filtering.
+SYNTHESIZER_MODE=llm
+LLM_PROVIDER=ollama
+LLM_MODEL=<your-model>
 
-The context loader retries retryable failures once. A persistent failure:
-
-- records a structured workflow error;
-- marks `analysis_complete=False`;
-- identifies the source in `unavailable_sources`;
-- prevents findings from being fabricated from unavailable data; and
-- triggers human review when the analysis cannot be considered complete.
-
-`FailureSimulator` provides deterministic first-N-call failures for testing
-these recovery paths without randomness.
-
-## Request routing and shared state
-
-`StayOpsState` contains the complete typed workflow state and is initialized by
-`create_initial_state()`. The request router extracts:
-
-- operational intent;
-- canonical property IDs;
-- an ISO date or date range; and
-- whether the request could produce a write.
-
-Relative dates use an injectable reference date for deterministic tests. The
-state retains loaded context, specialist findings, priorities, proposed
-actions, risk decisions, human decisions, write attempts, simulated
-executions, errors, run telemetry, and the final response.
-
-## Specialist analysis
-
-Booking, Guest, Turnover, and Maintenance specialists are independent typed
-LangChain runnables. They accept only supplied operational records and return
-evidence-linked findings with severities, recommended next actions, analyzed
-record IDs, confidence, and source-data warnings.
-
-The specialists are read-only:
-
-- **Booking** identifies arrivals, departures, occupancy, booking gaps,
-  conflicts, and same-day turnovers.
-- **Guest** identifies unanswered messages, complaints, early check-in requests,
-  and guest-reported maintenance issues.
-- **Turnover** evaluates cleaning schedules, assignments, confirmations, and
-  timing against the next arrival. Property-specific cleaner-ready buffers are
-  included in the analysis and cited as evidence.
-- **Maintenance** evaluates open issues, severity, current guest impact, and
-  upcoming reservation impact.
-
-An exception in one specialist branch is isolated so its parallel peers can
-still finish. Each branch records status, latency, finding count, warning count,
-and analyzed-record count.
-
-## Operations synthesis
-
-After the selected specialists finish, the Operations Synthesizer receives only
-their structured findings. Deterministic synthesis remains the zero-config
-default. Optional LLM synthesis may group related findings, rank them, and write
-a concise summary, but it cannot access tools or construct executable actions.
-
-Regardless of mode, deterministic Python code:
-
-- preserves record-level evidence;
-- combines explicitly related cross-specialist findings;
-- assigns stable priority ranks;
-- derives overall operational status;
-- identifies affected properties; and
-- creates unexecuted action proposals.
-
-Cross-specialist findings are combined only when they share supporting record
-evidence. Same-property findings with unrelated evidence remain separate. An
-LLM draft must cover every supplied finding exactly once, stay within the routed
-property scope, preserve uncertainty in conflicting evidence, cite only known
-finding IDs, and avoid unsupported record/date/time references. Invalid output
-is rejected before it reaches the safety gate.
-
-### Synthesizer configuration
-
-Use [`.env.example`](.env.example) as the configuration reference. With no
-environment settings, the application uses deterministic synthesis and needs no
-model credential.
-
-Nebius Token Factory example:
-
-```bash
-export SYNTHESIZER_MODE=llm
-export LLM_PROVIDER=nebius
-export LLM_MODEL=<provider-model-id>
-export NEBIUS_API_KEY=<nebius-api-key>
-export LLM_SYNTHESIZER_FALLBACK=deterministic
 uv run streamlit run app.py
-```
 
-Local Ollama example:
+# Run with Nebius
 
-```bash
-export SYNTHESIZER_MODE=llm
-export LLM_PROVIDER=ollama
-export LLM_MODEL=<local-model-name>
-export OLLAMA_BASE_URL=http://localhost:11434
-export LLM_SYNTHESIZER_FALLBACK=deterministic
+Configure the required environment variables:
+
+SYNTHESIZER_MODE=llm
+LLM_PROVIDER=nebius
+LLM_MODEL=<your-model>
+LLM_API_KEY=<your-key>
+LLM_BASE_URL=<configured-nebius-endpoint>
+
 uv run streamlit run app.py
-```
 
-StayOps never reads `OPENAI_API_KEY`; Nebius uses only `NEBIUS_API_KEY` (or the
-provider-neutral `LLM_API_KEY`).
+Never commit API keys to the repository.
 
-`LLM_SYNTHESIZER_FALLBACK=deterministic` safely completes a run with the
-baseline synthesizer if the provider, schema validation, or grounding check
-fails. Set it to `disabled` to make the run incomplete and require human review
-instead. Agent Activity shows mode, provider, model, status, latency, finding
-count, and fallback state. It never stores or displays API keys or raw prompts.
+# Running Tests
 
-## Deterministic risk and action gate
-
-A pure-Python gate evaluates structured findings, typed action proposals, and
-the router's write-intent flag. It records explicit reasons for human review
-when it detects:
-
-- message sends, reservation modifications, or record updates;
-- high- or critical-severity maintenance findings;
-- confidence below the configurable `0.75` threshold;
-- contradictory turnover findings about the same property and source record;
-- required source data that remains unavailable after retry;
-- synthesis that fails while deterministic fallback is disabled; or
-- a request classified as potentially write-producing.
-
-Drafts and read-only review proposals remain safe unless another rule applies.
-If gate evaluation fails, the workflow defaults to requiring human review.
-
-## Human review
-
-When review is required, LangGraph `interrupt()` pauses the graph with a
-JSON-serializable payload containing proposed actions, evidence-linked
-findings, review reasons, and supported Approve, Edit, and Reject decisions.
-The current host-facing dashboard intentionally exposes only Approve and Reject;
-the programmatic workflow retains Edit-and-reconfirm support.
-
-The graph uses an in-memory checkpointer by default. Callers resume the same
-thread with `Command(resume=...)`:
-
-```python
-from langgraph.types import Command
-
-config = {"configurable": {"thread_id": "review-123"}}
-paused = graph.invoke(initial_state, config=config)
-request = paused["__interrupt__"][0].value
-
-completed = graph.invoke(
-    Command(
-        resume={
-            "decision": "approve",
-            "action_id": request["proposed_actions"][0]["action_id"],
-        }
-    ),
-    config=config,
-)
-```
-
-Approve and Reject complete the review. Edit changes only the selected
-proposal's description, preserves its type and evidence links, and pauses again
-for reconfirmation. Invalid responses remain interrupted with a validation
-message. A source-failure review with no proposed action can be acknowledged or
-rejected and never reaches a write tool.
-
-## Approval-protected simulated writes
-
-The protected executor supports:
-
-- `send_guest_message()`
-- `send_cleaner_message()`
-- `update_maintenance_status()`
-
-An approved executable proposal contains its exact tool, target, and
-parameters. The workflow then issues a one-time capability bound to the request
-ID, action ID, tool, target, content, and complete action fingerprint. Each
-write function independently validates and consumes that capability.
-
-Missing, invalid, replayed, cross-tool, cross-request, and content-mismatched
-tokens are rejected. Every call produces a structured attempt record;
-successful simulations also produce an execution record. Reject creates no
-capability or write attempt.
-
-Successful simulations are recorded under `data/runtime/` in separate outbound
-message, record-update, and action-history files. Read tools overlay those
-records on the immutable fixtures, so the approved result is visible in the UI:
-a guest message becomes answered, a cleaner reminder is recorded, or a
-maintenance status changes. Runtime files are ignored by Git. The simulation
-does not mutate source fixtures or call an external messaging, booking, or
-maintenance service.
-
-## Response generation
-
-A typed response generator runs after safe completion, rejection, or approved
-execution. It answers the routed question in its first sentence and formats only
-the operational fields relevant to the request:
-
-- arrivals include property, guest, check-in time, and guest count;
-- daily attention separates Needs Action from Watch items;
-- turnover answers include checkout, cleaning target, next check-in,
-  confirmation, and next step;
-- guest-message answers show urgency, concise content, and approval status;
-- maintenance answers show severity, guest impact, status, and next step; and
-- property-status answers directly say Ready, At Risk, or Needs Action.
-
-Secondary risks appear separately under `Heads up`. Dates and times are
-human-friendly, empty results are stated directly, and approval copy identifies
-the exact action waiting for review. The generator reports execution failures
-instead of presenting an approval as a successful action.
-
-## Streamlit dashboard
-
-The root `app.py` provides:
-
-- Needs Action, Watch, Ready for Guests, and Arrivals Today portfolio counts;
-- prioritized attention cards with supporting evidence;
-- property cards and property drill-downs;
-- dedicated Guest Messages, Turnovers, Maintenance, and Arrivals workspaces;
-- property operating rules;
-- URL-backed sidebar navigation that opens the requested workspace;
-- Ask StayOps form and quick prompts against the same operations graph;
-- an intent-aware `✨ StayOps Answer` shown only after a user asks a question;
-- Approve & Send, Approve & Update, Reject, and failure-acknowledgement controls;
-  and
-- optional Agent Activity details for routing, specialists, synthesis, safety,
-  telemetry, and errors.
-
-One controller and checkpointer remain alive within each Streamlit session so
-an interrupted review resumes its original graph thread. Approval capability
-values are intentionally excluded from the debug display.
-
-When a required source remains unavailable, the dashboard prominently labels
-the analysis as incomplete and never presents an unverified property as Ready.
-
-## Current implementation boundaries
-
-The router, specialists, response generator, safety gate, and approval controls
-remain deterministic typed components. The synthesizer has interchangeable
-deterministic and structured-output LLM implementations behind the same graph
-boundary. Nebius and Ollama affect only synthesis; they do not alter routing,
-retrieval, specialist analysis, HITL, write authorization, or execution.
-
-Checkpointing is in memory and supports pause/resume within the running
-application. Simulated approved changes persist through the local runtime
-overlay, but persistent graph checkpoints, cross-request conversational memory,
-and a Mem0 memory layer are not currently configured.
-
-## Installation
-
-This project requires Python 3.12 or newer and uses `uv` for dependency
-management.
-
-```bash
-uv sync --all-groups
-```
-
-## Run the dashboard
-
-```bash
-uv run streamlit run app.py
-```
-
-## Tests and evaluation
-
-Run the complete automated test suite:
-
-```bash
 uv run pytest
-```
 
-The current suite contains 223 tests covering datasets, tools, date parsing,
-routing, specialist isolation, synthesis, safety, human review, protected
-writes, response formatting, evaluation contracts, and Streamlit interactions.
+# Project Goal
 
-Run the deterministic evaluation harness and refresh its saved reports:
+Project Goal
 
-```bash
-uv run python -m src.evaluation.runner
-```
+StayOps AI succeeds when a self-managing host can move from scattered property operations to one prioritized view of what needs attention—while the system handles safe analysis autonomously, fails safely when information is missing, and never takes a consequential action without human approval.
 
-The evaluation scenarios cover routine operations, same-day turnover, missing
-cleaner confirmation, a guest maintenance complaint, conflicting findings,
-transient and persistent read failures, an attempted write without approval,
-and an explicitly approved write.
 
-Metrics include routing accuracy, specialist activation, priority/risk
-accuracy, approval enforcement, safe failure recovery, latency, and unsupported
-critical claims. Aggregate reports also record synthesizer mode/provider/model,
-average and P95 synthesis latency, model/schema failure rate, and fallback
-count. Saved outputs include:
+### Why I prefer this version
 
-- `evaluation/results/scenario_results.json`
-- per-scenario diagnostics under `evaluation/results/scenarios/`
-- `evaluation/results/aggregate_report.json`
+It tells the project story in this order:
 
-The latest saved report records 9/9 passing scenarios with
-`all_targets_met=true`. The command exits non-zero if an aggregate target is
-missed. Automated latency is not a substitute for human usability evidence; use
-[`evaluation/usability_protocol.md`](evaluation/usability_protocol.md) to test
-whether a host can identify and act on important issues in under five minutes.
+**Problem → product → architecture → why multi-agent → real scenario → HITL → failures → LLM decision → evaluation → tech.**
 
-For a controlled A/B/C comparison, run the identical scenario set into separate
-directories:
 
-```bash
-SYNTHESIZER_MODE=deterministic \
-  uv run python -m src.evaluation.runner --output-dir evaluation/results/deterministic
-
-SYNTHESIZER_MODE=llm LLM_PROVIDER=nebius \
-  LLM_MODEL=<provider-model-id> NEBIUS_API_KEY=<nebius-api-key> \
-  uv run python -m src.evaluation.runner --output-dir evaluation/results/nebius
-
-SYNTHESIZER_MODE=llm LLM_PROVIDER=ollama \
-  LLM_MODEL=<local-model-name> \
-  uv run python -m src.evaluation.runner --output-dir evaluation/results/ollama
-```
-
-Compare task pass rates, unsupported claims, average/P95 synthesis latency,
-failure rate, and fallback count. Use at least three repeated runs per variant
-before drawing a provider conclusion.
-
-## Demo runbook
-
-1. Start the dashboard and ask, “Which guests are arriving today?” for an
-   intent-aware arrivals answer. Try “tomorrow,” a weekday name, or “this
-   weekend” to demonstrate calendar routing.
-2. Inspect a proposed cleaner or maintenance action in Human Approvals, then
-   Approve or Reject it. An approval updates the local simulated runtime and the
-   corresponding UI records without contacting anyone.
-3. Enable Agent Activity to inspect routing, selected specialists, synthesis,
-   safety checks, latency, and structured errors.
-4. Run `uv run python -m src.evaluation.runner` and inspect
-   `evaluation/results/scenarios/persistent_tool_failure.json` for the
-   two-attempt failure, incomplete-analysis escalation, review pause, and zero
-   executions.

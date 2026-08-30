@@ -108,6 +108,45 @@ def test_weekend_scope_is_applied_to_loaded_context() -> None:
     )
 
 
+def test_august_30_query_loads_rich_linked_operational_data() -> None:
+    graph = build_phase_4_graph(reference_date=date(2026, 8, 29))
+
+    result = graph.invoke(
+        create_initial_state(
+            "What needs my attention tomorrow?",
+            request_id="august-30-rich-data",
+        )
+    )
+
+    assert result["date_scope"] == "2026-08-30"
+    assert {
+        "res_city_004",
+        "res_downtown_004",
+        "res_sunset_003",
+    } <= set(result["reservation_context"])
+    assert set(result["cleaning_context"]) == {
+        "clean_city_003",
+        "clean_downtown_001",
+        "clean_sunset_001",
+    }
+    assert set(result["guest_message_context"]) == {
+        "msg_city_004",
+        "msg_downtown_003",
+        "msg_lake_003",
+        "msg_sunset_004",
+    }
+    assert {
+        "maint_city_003",
+        "maint_downtown_003",
+        "maint_lake_003",
+        "maint_sunset_003",
+    } <= set(result["maintenance_context"])
+    assert result["booking_findings"]
+    assert result["guest_findings"]
+    assert result["turnover_findings"]
+    assert result["maintenance_findings"]
+
+
 def test_retryable_context_failure_recovers_before_specialist_runs() -> None:
     simulator = FailureSimulator(
         SimulatedFailureConfig(

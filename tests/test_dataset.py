@@ -81,10 +81,10 @@ def test_expanded_operational_data_covers_every_property(
         item.property_id for item in dataset.maintenance_tickets
     )
 
-    assert len(dataset.reservations) == 21
-    assert len(dataset.guest_messages) == 17
-    assert len(dataset.cleaning_schedule) == 16
-    assert len(dataset.maintenance_tickets) == 14
+    assert len(dataset.reservations) == 32
+    assert len(dataset.guest_messages) == 29
+    assert len(dataset.cleaning_schedule) == 25
+    assert len(dataset.maintenance_tickets) == 26
     assert all(reservations_by_property[property_id] >= 2 for property_id in property_ids)
     assert all(messages_by_property[property_id] >= 1 for property_id in property_ids)
     assert all(cleanings_by_property[property_id] >= 1 for property_id in property_ids)
@@ -157,6 +157,7 @@ def test_vacant_properties_and_no_attention_property_are_represented(
         message
         for message in dataset.guest_messages
         if message.property_id == "prop_sunset_house"
+        and message.received_at.date() <= OPERATING_DATE
         and message.requires_response
         and message.responded_at is None
     ]
@@ -164,10 +165,79 @@ def test_vacant_properties_and_no_attention_property_are_represented(
         ticket
         for ticket in dataset.maintenance_tickets
         if ticket.property_id == "prop_sunset_house"
+        and ticket.created_at.date() <= OPERATING_DATE
         and ticket.status != MaintenanceStatus.RESOLVED
     ]
     assert sunset_unanswered == []
     assert sunset_open_tickets == []
+
+
+def test_august_30_has_linked_arrivals_turnovers_messages_and_maintenance(
+    dataset: StayOpsDataset,
+) -> None:
+    target_date = date(2026, 8, 30)
+    arrival_ids = {
+        reservation.id
+        for reservation in dataset.reservations
+        if reservation.check_in_date == target_date
+    }
+    cleanings = [
+        cleaning
+        for cleaning in dataset.cleaning_schedule
+        if cleaning.scheduled_date == target_date
+    ]
+    message_ids = {
+        message.id
+        for message in dataset.guest_messages
+        if message.received_at.date() == target_date
+    }
+    maintenance_ids = {
+        ticket.id
+        for ticket in dataset.maintenance_tickets
+        if ticket.created_at.date() == target_date
+    }
+
+    assert arrival_ids == {
+        "res_city_004",
+        "res_downtown_004",
+        "res_sunset_003",
+    }
+    assert {cleaning.next_reservation_id for cleaning in cleanings} == arrival_ids
+    assert message_ids == {
+        "msg_city_004",
+        "msg_downtown_003",
+        "msg_lake_003",
+        "msg_sunset_004",
+    }
+    assert maintenance_ids == {
+        "maint_city_003",
+        "maint_downtown_003",
+        "maint_lake_003",
+        "maint_sunset_003",
+    }
+
+
+def test_future_data_extends_every_property_into_mid_september(
+    dataset: StayOpsDataset,
+) -> None:
+    property_ids = {prop.id for prop in dataset.properties}
+    future_cutoff = date(2026, 9, 10)
+
+    assert {
+        reservation.property_id
+        for reservation in dataset.reservations
+        if reservation.check_in_date > future_cutoff
+    } == property_ids
+    assert {
+        cleaning.property_id
+        for cleaning in dataset.cleaning_schedule
+        if cleaning.scheduled_date > future_cutoff
+    } == property_ids
+    assert {
+        ticket.property_id
+        for ticket in dataset.maintenance_tickets
+        if ticket.created_at.date() > future_cutoff
+    } == property_ids
 
 
 def test_cross_file_validation_rejects_broken_foreign_key() -> None:
