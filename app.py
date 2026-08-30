@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from html import escape
 from typing import Any
@@ -38,9 +39,6 @@ OPERATIONS_VIEW_TO_TAB = {
     "turnovers": "Turnovers",
     "maintenance": "Maintenance",
     "arrivals": "Arrivals",
-}
-OPERATIONS_TAB_TO_VIEW = {
-    tab_label: view for view, tab_label in OPERATIONS_VIEW_TO_TAB.items()
 }
 SIDEBAR_NAVIGATION = (
     ("command_center", "Command Center"),
@@ -160,6 +158,33 @@ def _install_theme() -> None:
         .property-meta strong { display:block; color:var(--navy); font-size:.72rem; margin-bottom:.1rem; }
         .approval-banner { background:#fff7e2; border-color:#e7c46f; margin:.45rem 0 1rem; }
         .approval-banner strong { display:block; color:#6f4b0d; margin-bottom:.2rem; }
+        .approval-property-header {
+            display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;
+            background:#e2f0eb; border:1px solid #c7ddd5; border-left:4px solid var(--teal);
+            border-radius:11px; padding:.72rem .82rem; margin-bottom:.9rem;
+        }
+        .approval-property-name { color:var(--navy); font-size:1.16rem; font-weight:840; }
+        .approval-property-count {
+            color:#fff; background:var(--teal-dark); border-radius:999px;
+            font-size:.72rem; font-weight:800; padding:.25rem .6rem; white-space:nowrap;
+        }
+        .approval-action-type { color:var(--navy); font-size:1rem; font-weight:800; margin:.1rem 0 .72rem; }
+        .approval-label {
+            color:var(--teal-dark); font-size:.68rem; font-weight:850;
+            letter-spacing:.11em; text-transform:uppercase; margin:.62rem 0 .15rem;
+        }
+        .approval-copy { color:#425966; font-size:.88rem; line-height:1.5; }
+        .proposal-box {
+            background:#f4f8f6; border:1px solid #d5e2dc; border-radius:11px;
+            color:var(--navy); font-size:.9rem; line-height:1.5; padding:.72rem .82rem;
+            margin:.2rem 0 .7rem;
+        }
+        .status-change { display:flex; align-items:center; flex-wrap:wrap; gap:.48rem; }
+        .status-change .field { color:var(--muted); font-size:.78rem; font-weight:750; margin-right:.25rem; }
+        .status-change .before { color:#6f7d84; }
+        .status-change .arrow { color:var(--teal-dark); font-weight:850; }
+        .status-change .after { color:var(--teal-dark); font-weight:820; }
+        .approval-divider { border-top:1px solid var(--line); margin:1rem 0 .85rem; }
         .st-key-stayops_answer {
             background:#edf4f9; border-color:#d8e5ee; border-radius:16px;
         }
@@ -201,6 +226,10 @@ def _install_theme() -> None:
         .activity-status { font-weight:750; }
         @keyframes activity-pulse { 50% { opacity:.35; transform:scale(.82); } }
         .sidebar-brand { font-size:1.1rem; font-weight:850; color:var(--navy); letter-spacing:.08em; margin:.15rem 0 1rem; }
+        .st-key-home_button button {
+            width:100%; justify-content:flex-start; background:#f7fbf9;
+            border:1px solid #bdd3ca; color:var(--teal-dark); font-weight:760;
+        }
         .st-key-sidebar_navigation [role="radiogroup"] { gap:.22rem; }
         .st-key-sidebar_navigation label {
             background:transparent !important; border:0 !important; border-radius:9px;
@@ -251,7 +280,17 @@ def _sync_sidebar_view() -> None:
     selected_label = st.session_state.get("sidebar_navigation")
     selected_view = SIDEBAR_LABEL_TO_VIEW.get(selected_label)
     if selected_view is not None:
+        if selected_view in OPERATIONS_VIEW_TO_TAB:
+            st.session_state.operations_tab = OPERATIONS_VIEW_TO_TAB[selected_view]
         st.query_params["view"] = selected_view
+
+
+def _go_home() -> None:
+    """Reset all navigation state and return to the Command Center."""
+
+    st.query_params["view"] = "command_center"
+    st.session_state.sidebar_navigation = "Command Center"
+    st.session_state.property_drilldown = "All properties"
 
 
 def _render_sidebar_navigation(current_view: str) -> None:
@@ -271,15 +310,6 @@ def _render_sidebar_navigation(current_view: str) -> None:
         on_change=_sync_sidebar_view,
         label_visibility="collapsed",
     )
-
-
-def _sync_operations_view() -> None:
-    """Keep the URL and sidebar highlight aligned with a manual tab change."""
-
-    selected_tab = st.session_state.get("operations_tab")
-    selected_view = OPERATIONS_TAB_TO_VIEW.get(selected_tab)
-    if selected_view is not None:
-        st.query_params["view"] = selected_view
 
 
 def _status_pill(health: PropertyHealth) -> str:
@@ -1071,19 +1101,17 @@ def _render_operations_views(
         requested_view,
         "Needs Your Attention",
     )
+    previous_route = st.session_state.get("operations_requested_view")
     if (
         "operations_tab" not in st.session_state
-        or (
-            requested_view in OPERATIONS_VIEW_TO_TAB
-            and st.session_state.operations_tab != requested_tab
-        )
+        or previous_route != requested_view
     ):
         st.session_state.operations_tab = requested_tab
+    st.session_state.operations_requested_view = requested_view
     priorities, messages, cleanings, maintenance, arrivals = st.tabs(
         tab_labels,
-        default=requested_tab,
         key="operations_tab",
-        on_change=_sync_operations_view,
+        on_change="rerun",
     )
     with priorities:
         _render_priorities(result, property_id)
@@ -1100,12 +1128,188 @@ def _render_operations_views(
 def _approval_explanation(action: dict[str, Any]) -> str:
     tool_name = action.get("tool_name")
     if tool_name == "send_guest_message":
-        return "This action will simulate sending a message to the guest."
+        return (
+            "Approval is required because this action sends a message to the guest."
+        )
     if tool_name == "send_cleaner_message":
-        return "This action will simulate sending a message to the cleaner."
+        return (
+            "Approval is required because this action sends a message to the cleaner."
+        )
     if tool_name == "update_maintenance_status":
-        return "This action will update the simulated maintenance record."
-    return "This operational decision requires your review before StayOps continues."
+        return (
+            "Approval is required because this action changes an operational record."
+        )
+    return (
+        "Approval is required before StayOps can continue with this operational step."
+    )
+
+
+def _approval_action_label(action: dict[str, Any]) -> str:
+    labels = {
+        "send_guest_message": "Reply to guest",
+        "send_cleaner_message": "Contact cleaner",
+        "update_maintenance_status": "Update maintenance status",
+    }
+    return labels.get(
+        action.get("tool_name"),
+        _humanize(action.get("action_type", "Review action")),
+    )
+
+
+def _findings_for_action(
+    action: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    source_ids = set(action.get("source_finding_ids", []))
+    return [
+        finding
+        for finding in findings
+        if source_ids.intersection(finding.get("source_finding_ids", []))
+    ]
+
+
+def _humanize_embedded_dates(value: str) -> str:
+    """Make ISO dates readable while preserving the graph-provided wording."""
+
+    return re.sub(
+        r"\b\d{4}-\d{2}-\d{2}\b",
+        lambda match: _format_date(match.group()),
+        value,
+    )
+
+
+def _approval_why_now(
+    action: dict[str, Any],
+    findings: list[dict[str, Any]],
+) -> str:
+    supporting = _findings_for_action(action, findings)
+    summary = next(
+        (
+            str(finding.get("summary", "")).strip()
+            for finding in supporting
+            if str(finding.get("summary", "")).strip()
+        ),
+        str(action.get("description", "Review this operational action.")).strip(),
+    )
+    return _humanize_embedded_dates(summary)
+
+
+def _group_approval_actions(
+    actions: list[dict[str, Any]],
+) -> list[tuple[str, list[dict[str, Any]]]]:
+    """Group actions by property while retaining their priority order."""
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for action in actions:
+        grouped.setdefault(action["property_id"], []).append(action)
+    return list(grouped.items())
+
+
+def _approval_proposal_markup(
+    action: dict[str, Any],
+    result: dict[str, Any],
+) -> str:
+    tool_name = action.get("tool_name")
+    if tool_name in {"send_guest_message", "send_cleaner_message"}:
+        message = action.get("parameters", {}).get("message") or action.get(
+            "description",
+            "",
+        )
+        return (
+            '<div class="approval-label">Proposed message</div>'
+            f'<div class="proposal-box">“{escape(str(message))}”</div>'
+        )
+    if tool_name == "update_maintenance_status":
+        target_record_id = action.get("target_record_id")
+        record = result.get("maintenance_context", {}).get(target_record_id, {})
+        current_value = record.get("status")
+        proposed_value = action.get("parameters", {}).get("status")
+        current_status = (
+            _humanize(current_value) if current_value else "Not available"
+        )
+        proposed_status = (
+            _humanize(proposed_value) if proposed_value else "Not provided"
+        )
+        return (
+            '<div class="approval-label">Proposed change</div>'
+            '<div class="proposal-box status-change">'
+            '<span class="field">Maintenance status</span>'
+            f'<span class="before">{escape(current_status)}</span>'
+            '<span class="arrow">→</span>'
+            f'<span class="after">{escape(proposed_status)}</span>'
+            '</div>'
+        )
+    return (
+        '<div class="approval-label">Proposed action</div>'
+        '<div class="proposal-box">'
+        f'{escape(str(action.get("description", "")))}</div>'
+    )
+
+
+def _render_approval_action(
+    controller: DashboardController,
+    action: dict[str, Any],
+    request: dict[str, Any],
+    result: dict[str, Any],
+    activity_slot: Any | None,
+) -> None:
+    action_id = action["action_id"]
+    tool_name = action.get("tool_name")
+    approve_label = (
+        "Approve & Send"
+        if tool_name in {"send_guest_message", "send_cleaner_message"}
+        else "Approve & Update"
+        if tool_name == "update_maintenance_status"
+        else "Approve"
+    )
+    st.markdown(
+        '<div class="approval-action-type">'
+        f'{escape(_approval_action_label(action))}</div>'
+        '<div class="approval-label">Why now</div>'
+        '<div class="approval-copy">'
+        f'{escape(_approval_why_now(action, request.get("findings", [])))}</div>'
+        '<div class="approval-label">Approval required</div>'
+        f'<div class="approval-copy">{escape(_approval_explanation(action))}</div>'
+        f'{_approval_proposal_markup(action, result)}',
+        unsafe_allow_html=True,
+    )
+    approve_col, reject_col = st.columns(2)
+    if approve_col.button(
+        approve_label,
+        type="primary",
+        width="stretch",
+        key=f"approve_{controller.thread_id}_{action_id}",
+    ):
+        progress_message = (
+            "Approving and sending the simulated message…"
+            if tool_name in {"send_guest_message", "send_cleaner_message"}
+            else "Approving and updating the simulated record…"
+        )
+        with st.spinner(progress_message):
+            _resume_review(
+                controller,
+                "approve",
+                action_id,
+                activity_slot=activity_slot,
+            )
+        st.rerun()
+    if reject_col.button(
+        "Reject",
+        width="stretch",
+        key=f"reject_{controller.thread_id}_{action_id}",
+    ):
+        _resume_review(
+            controller,
+            "reject",
+            action_id,
+            activity_slot=activity_slot,
+        )
+        st.rerun()
+    supporting = evidence_for_action(action, request.get("findings", []))
+    plain_evidence = _plain_evidence_lines(supporting, result)
+    with st.expander("View source details"):
+        for line in plain_evidence:
+            st.write(line)
 
 
 def _render_review(
@@ -1116,23 +1320,12 @@ def _render_review(
     _section_heading(
         "approval-center",
         "Human Approvals",
-        "Review every proposed write before it can be simulated.",
+        "Review each action StayOps cannot take without you.",
     )
     if request is None:
         st.info("No approvals are pending for the latest StayOps request.")
         return
     result = controller.result or controller.daily_result or {}
-    st.markdown(
-        '<div class="approval-banner">'
-        '<strong>Your approval is needed</strong>'
-        '<span>StayOps never sends messages or changes operational records without you.</span>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-    st.caption(
-        "Simulation mode: no external message is sent. Approved changes are saved "
-        "to the local demo runtime and reflected in these screens."
-    )
     actions = request.get("proposed_actions", [])
     if not actions:
         st.error("StayOps could not complete this operational check.")
@@ -1145,68 +1338,47 @@ def _render_review(
             _resume_review(controller, "approve", None, activity_slot=activity_slot)
             st.rerun()
         return
-
-    for action in actions:
-        action_id = action["action_id"]
-        property_name = _property_name(result, action["property_id"])
-        action_label = action["action_type"].replace("_", " ").title()
-        tool_name = action.get("tool_name")
-        approve_label = (
-            "Approve & Send"
-            if tool_name in {"send_guest_message", "send_cleaner_message"}
-            else "Approve & Update"
-            if tool_name == "update_maintenance_status"
-            else "Approve"
+    st.markdown(
+        '<div class="approval-banner">'
+        '<strong>Your approval is needed</strong>'
+        '<span>StayOps found actions it cannot take without you.<br>'
+        'Nothing is sent or changed until you approve.</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Simulation mode: no external message is sent. Approved changes are saved "
+        "to the local demo runtime and reflected in these screens."
+    )
+    for property_id, property_actions in _group_approval_actions(actions):
+        property_name = _property_name(result, property_id)
+        action_count = len(property_actions)
+        count_label = (
+            "1 action needs your approval"
+            if action_count == 1
+            else f"{action_count} actions need your approval"
         )
         with st.container(border=True):
             st.markdown(
-                f"### {escape(property_name)}  \n"
-                f"**{escape(action_label)}**"
-            )
-            st.markdown("**Why your approval is required**")
-            st.caption(_approval_explanation(action))
-            st.markdown("**Proposed action**")
-            st.markdown(
-                f'<div class="detail-line">{escape(action["description"])}</div>',
+                '<div class="approval-property-header">'
+                f'<div class="approval-property-name">{escape(property_name)}</div>'
+                f'<div class="approval-property-count">{escape(count_label)}</div>'
+                '</div>',
                 unsafe_allow_html=True,
             )
-            supporting = evidence_for_action(action, request.get("findings", []))
-            plain_evidence = _plain_evidence_lines(supporting, result)
-            with st.expander("Why StayOps suggested this"):
-                for line in plain_evidence:
-                    st.write(line)
-            approve_col, reject_col = st.columns(2)
-            if approve_col.button(
-                approve_label,
-                type="primary",
-                width="stretch",
-                key=f"approve_{controller.thread_id}_{action_id}",
-            ):
-                progress_message = (
-                    "Approving and sending the simulated message…"
-                    if tool_name in {"send_guest_message", "send_cleaner_message"}
-                    else "Approving and updating the simulated record…"
-                )
-                with st.spinner(progress_message):
-                    _resume_review(
-                        controller,
-                        "approve",
-                        action_id,
-                        activity_slot=activity_slot,
+            for index, action in enumerate(property_actions):
+                if index:
+                    st.markdown(
+                        '<div class="approval-divider"></div>',
+                        unsafe_allow_html=True,
                     )
-                st.rerun()
-            if reject_col.button(
-                "Reject",
-                width="stretch",
-                key=f"reject_{controller.thread_id}_{action_id}",
-            ):
-                _resume_review(
+                _render_approval_action(
                     controller,
-                    "reject",
-                    action_id,
-                    activity_slot=activity_slot,
+                    action,
+                    request,
+                    result,
+                    activity_slot,
                 )
-                st.rerun()
 
 
 def _stayops_answer(controller: DashboardController) -> str:
@@ -1393,6 +1565,12 @@ def main() -> None:
     property_names = {summary.name: summary for summary in summaries}
     with st.sidebar:
         st.markdown('<div class="sidebar-brand">STAYOPS AI</div>', unsafe_allow_html=True)
+        st.button(
+            "⌂  Home",
+            key="home_button",
+            on_click=_go_home,
+            width="stretch",
+        )
         _render_sidebar_navigation(requested_view)
         st.markdown("---")
         selected_name = st.selectbox(

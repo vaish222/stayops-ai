@@ -9,6 +9,7 @@ from tempfile import mkdtemp
 import pytest
 from streamlit.testing.v1 import AppTest
 
+from app import _group_approval_actions
 from src.graph import build_phase_8_graph
 from src.tools import (
     FailureSimulator,
@@ -122,13 +123,60 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
         "Guests needing replies",
     }
     assert page_markup.count("Your approval is needed") == 1
-    assert "Why your approval is required" in page_markup
-    assert any(
-        "This action will simulate sending a message to the cleaner." in item.value
-        for item in app.caption
+    assert "StayOps found actions it cannot take without you." in page_markup
+    assert "Nothing is sent or changed until you approve." in page_markup
+    assert "Why now" in page_markup
+    assert "Approval required" in page_markup
+    assert "Contact cleaner" in page_markup
+    assert "Same-day turnover has a missing cleaner confirmation." in page_markup
+    assert (
+        "Approval is required because this action sends a message to the cleaner."
+        in page_markup
     )
+    assert "Proposed message" in page_markup
+    assert (
+        "Please confirm whether the scheduled turnover will be completed by the target time."
+        in page_markup
+    )
+    assert "Update maintenance status" in page_markup
+    assert "Proposed change" in page_markup
+    assert "Maintenance status" in page_markup
+    assert "Open" in page_markup
+    assert "In Progress" in page_markup
+    controller = app.session_state["stayops_controller"]
+    expected_property_groups = len(
+        _group_approval_actions(controller.pending_review["proposed_actions"])
+    )
+    approval_headers = [
+        item.value
+        for item in app.markdown
+        if item.value.startswith('<div class="approval-property-header">')
+    ]
+    assert len(approval_headers) == expected_property_groups
+    assert any("2 actions need your approval" in header for header in approval_headers)
+    assert {expander.label for expander in app.expander} >= {"View source details"}
+    assert "Why StayOps suggested this" not in {
+        expander.label for expander in app.expander
+    }
+    assert sum("Simulation mode:" in item.value for item in app.caption) == 1
     assert "Edit" not in {button.label for button in app.button}
     assert len(app.text_area) == 0
+
+
+def test_approval_actions_are_grouped_by_property_in_priority_order() -> None:
+    actions = [
+        {"action_id": "first", "property_id": "prop_lake_house"},
+        {"action_id": "second", "property_id": "prop_pine_house"},
+        {"action_id": "third", "property_id": "prop_lake_house"},
+    ]
+
+    grouped = _group_approval_actions(actions)
+
+    assert [property_id for property_id, _ in grouped] == [
+        "prop_lake_house",
+        "prop_pine_house",
+    ]
+    assert [action["action_id"] for action in grouped[0][1]] == ["first", "third"]
 
 
 def test_portfolio_filter_and_view_property_are_interactive() -> None:
@@ -205,6 +253,8 @@ def test_sidebar_operations_links_open_the_requested_tab(
     app = render_app(view)
 
     assert app.exception == []
+    assert len(app.tabs) == 5
+    assert tab_label in [tab.label for tab in app.tabs]
     assert app.session_state["operations_tab"] == tab_label
     assert app.radio(key="sidebar_navigation").value == tab_label
     page_markup = "\n".join(item.value for item in app.markdown)
@@ -229,10 +279,44 @@ def test_sidebar_navigation_click_updates_url_and_active_page() -> None:
     assert app.exception == []
     assert app.query_params["view"] in ("turnovers", ["turnovers"])
     assert app.radio(key="sidebar_navigation").value == "Turnovers"
+    assert len(app.tabs) == 5
     assert app.session_state["operations_tab"] == "Turnovers"
     page_markup = "\n".join(item.value for item in app.markdown)
     assert "Operations Workspace" in page_markup
     assert "Portfolio Overview" not in page_markup
+
+
+def test_home_button_returns_to_command_center_in_one_click() -> None:
+    app = render_app("maintenance")
+    app = app.selectbox(key="property_drilldown").select("Lake House").run()
+
+    app = app.button(key="home_button").click().run()
+
+    assert app.exception == []
+    assert app.query_params["view"] in ("command_center", ["command_center"])
+    assert app.radio(key="sidebar_navigation").value == "Command Center"
+    assert app.selectbox(key="property_drilldown").value == "All properties"
+    assert len(app.tabs) == 5
+    assert app.session_state["operations_tab"] == "Needs Your Attention"
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "Ask StayOps" in page_markup
+    assert "Portfolio Overview" in page_markup
+
+
+def test_sidebar_switches_between_turnovers_and_maintenance_in_one_session() -> None:
+    app = render_app()
+
+    app = app.radio(key="sidebar_navigation").set_value("Turnovers").run()
+    assert len(app.tabs) == 5
+    assert app.session_state["operations_tab"] == "Turnovers"
+
+    app = app.radio(key="sidebar_navigation").set_value("Maintenance").run()
+
+    assert app.exception == []
+    assert app.query_params["view"] in ("maintenance", ["maintenance"])
+    assert app.radio(key="sidebar_navigation").value == "Maintenance"
+    assert app.session_state["operations_tab"] == "Maintenance"
+    assert len(app.tabs) == 5
 
 
 @pytest.mark.parametrize(
@@ -380,6 +464,32 @@ def test_approve_executes_the_reviewed_action_without_edit_control() -> None:
     page_markup = "\n".join(item.value for item in app.markdown)
     assert "Simulated action completed" in page_markup
     assert "Waiting for your approval" in page_markup
+
+
+def test_approve_update_executes_the_visible_status_transition() -> None:
+    app = render_app()
+    controller = app.session_state["stayops_controller"]
+    update_action = next(
+        action
+        for action in controller.pending_review["proposed_actions"]
+        if action.get("tool_name") == "update_maintenance_status"
+    )
+    target_record_id = update_action["target_record_id"]
+    assert controller.result["maintenance_context"][target_record_id]["status"] == "open"
+
+    app = next(
+        button for button in app.button if button.label == "Approve & Update"
+    ).click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert controller.result["maintenance_context"][target_record_id]["status"] == (
+        "in_progress"
+    )
+    assert any(
+        "Approved and updated — simulation only" in item.value
+        for item in app.success
+    )
 
 
 def test_reject_control_records_decision_without_execution() -> None:
