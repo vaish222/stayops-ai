@@ -11,6 +11,8 @@ Instead of manually checking reservations, guest messages, cleaning schedules, a
 
 The system autonomously reads operational data, routes work to specialized agents, combines their findings into a prioritized briefing, and pauses for human approval before any consequential action is taken.
 
+> **Simulation boundary:** StayOps does not send real guest or cleaner messages and does not update an external property-management system. Approved actions are simulated, saved to the local `data/runtime/` overlay, and reflected in the UI without changing the source JSON fixtures.
+
 ---
 
 ## Why I Built This
@@ -100,50 +102,62 @@ stayops-ai/
 StayOps is built as a stateful LangGraph workflow rather than a single LLM call.
 
 ```text
-                         HOST
-                          │
-                          ▼
-                   STREAMLIT UI
-                          │
-                          ▼
-                DETERMINISTIC ROUTER
-                          │
-                          ▼
-                    CONTEXT LOADER
-                          │
-             ┌────────────┼────────────┐
-             │            │            │
-             ▼            ▼            ▼
-          BOOKING       GUEST       TURNOVER
-           AGENT        AGENT         AGENT
-             │            │            │
-             └────────────┼────────────┐
-                          │            │
-                          ▼            ▼
-                    MAINTENANCE AGENT
-                          │
-                          ▼
-                OPERATIONS SYNTHESIZER
-                   Deterministic / LLM
-                          │
-                          ▼
-                 DETERMINISTIC SAFETY
-                    /             \
-                   /               \
-             READ ONLY          ACTION
-                 │                 │
-                 ▼                 ▼
-              RESPONSE       HUMAN REVIEW
-                                  │
-                           Approve/Edit/Reject
-                                  │
-                                  ▼
-                         PROTECTED WRITE TOOL
-                                  │
-                                  ▼
-                               RESPONSE
+                              HOST
+                               │
+                               ▼
+                        STREAMLIT UI
+                               │
+                               ▼
+                     DETERMINISTIC ROUTER
+                               │
+                               ▼
+                         CONTEXT LOADER
+                               │
+                    SELECT SPECIALISTS BY INTENT
+                               │
+            ┌──────────┬────────┴───────┬────────────┐
+            │          │                │            │
+            ▼          ▼                ▼            ▼
+         BOOKING     GUEST           TURNOVER    MAINTENANCE
+          AGENT      AGENT             AGENT        AGENT
+            │          │                │            │
+            └──────────┴────────┬───────┴────────────┘
+                               │
+                   (parallel selected specialists)
+                               │
+                               ▼
+                     OPERATIONS SYNTHESIZER
+                        Deterministic / LLM
+                               │
+                               ▼
+                  DETERMINISTIC RISK/ACTION GATE
+                         /                 \
+                        /                   \
+              NO REVIEW REQUIRED       REVIEW REQUIRED
+                       │                       │
+                       │                       ▼
+                       │                 HUMAN REVIEW
+                       │              Approve or Reject
+                       │                /            \
+                       │               /              \
+                       │      APPROVAL-PROTECTED     RECORD
+                       │       SIMULATED WRITE      REJECTION
+                       │               \              /
+                       │                \            /
+                       │          MORE ACTIONS TO REVIEW?
+                       │             Yes: review again
+                       │             No: continue
+                       │                       │
+                       └───────────────────────┘
+                                               │
+                                               ▼
+                              INTENT-AWARE RESPONSE GENERATOR
 
 ```
+
+The four specialist nodes fan out from the context loader and run in parallel when selected; maintenance is not downstream of the other specialists. The Streamlit approval UI currently exposes per-action **Approve** and **Reject** controls. The backend human-review contract also supports **Edit → Reconfirm** for programmatic callers, but that control is not exposed in the current UI.
+
+Every approved write receives a one-time capability bound to the exact request, action, parameters, and write tool. Reusing the capability or changing the reviewed action causes the simulated write to be rejected.
 <img width="1536" height="1024" alt="ChatGPT Image Aug 28, 2026, 09_47_01 PM" src="https://github.com/user-attachments/assets/b4d64be6-45f5-469b-abf1-6fcad5c46a6e" />
 
 ---
@@ -154,30 +168,40 @@ A multi-agent system should not work only on the happy path.
 StayOps read tools support controlled failure simulation.
 
 ```text
-Tool Call
-    │
-    ▼
- Success?
-  /      \
-Yes       No
- │         │
-Continue  Retry once
-            │
-            ▼
-         Success?
-         /     \
-       Yes      No
-        │        │
-    Continue   Record error
-                 │
-                 ▼
-          Can analysis continue?
-             /          \
-           Yes           No
-            │             │
-      Partial result   Human review
+Read Tool Call
+      │
+      ▼
+   Success?
+   /      \
+ Yes       No
+  │         │
+Continue    ▼
+       Retryable with an attempt remaining?
+             /                    \
+           Yes                     No
+            │                       │
+       Retry once                   │
+         /     \                    │
+    Success   Failure               │
+       │         │                  │
+   Continue     └──────────────────┘
+                         │
+                         ▼
+          Record structured error and
+             mark source unavailable
+                         │
+                         ▼
+          Produce partial/incomplete analysis
+                         │
+                         ▼
+              Deterministic safety gate
+                         │
+                         ▼
+            Human review / acknowledgement
 
 ```
+
+Unavailable source data is never treated as an all-clear. Persistent read failures and synthesis failures remain visible in graph state and require human review or acknowledgement before the workflow completes.
 
 ---
 
@@ -195,7 +219,8 @@ Continue  Retry once
 | Package Management | uv                     |
 | Testing            | pytest                 |
 | Data               | Synthetic JSON         |
-| Persistence        | LangGraph checkpointer |
+| Workflow checkpointing | In-memory LangGraph checkpointer |
+| Simulated write persistence | Local JSON overlay in `data/runtime/` |
 
 ---
 
