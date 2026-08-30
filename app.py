@@ -188,6 +188,15 @@ def _install_theme() -> None:
         .st-key-stayops_answer {
             background:#edf4f9; border-color:#d8e5ee; border-radius:16px;
         }
+        .asked-question {
+            background:#f7fbf9; border:1px solid #c9ddd6; border-left:4px solid var(--teal);
+            border-radius:11px; margin:.55rem 0 1rem; padding:.65rem .8rem;
+        }
+        .asked-question-label {
+            color:var(--teal-dark); font-size:.66rem; font-weight:850;
+            letter-spacing:.11em; text-transform:uppercase; margin-bottom:.16rem;
+        }
+        .asked-question-text { color:var(--navy); font-size:.92rem; font-weight:680; }
         .agent-card { min-height:112px; }
         .agent-card strong { color:var(--navy); }
         .agent-count { font-size:1.12rem; font-weight:800; color:var(--teal-dark); margin:.35rem 0 .2rem; }
@@ -1394,6 +1403,15 @@ def _render_stayops_answer(controller: DashboardController) -> None:
     with st.container(border=True, key="stayops_answer"):
         st.markdown('<div id="stayops-answer"></div>', unsafe_allow_html=True)
         st.markdown("### ✨ StayOps Answer")
+        if controller.last_query:
+            st.markdown(
+                '<div class="asked-question">'
+                '<div class="asked-question-label">You asked</div>'
+                '<div class="asked-question-text">'
+                f'“{escape(controller.last_query)}”</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown(_stayops_answer(controller))
 
 

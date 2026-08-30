@@ -362,9 +362,40 @@ def test_ask_stayops_submits_to_graph_and_safe_result_needs_no_review() -> None:
     )
     page_markup = "\n".join(item.value for item in app.markdown)
     assert 'id="approval-center"' in page_markup
+    assert "You asked" in page_markup
+    assert f"“{query}”" in page_markup
     assert "1 arrival is scheduled on Aug 28." in page_markup
     assert "Taylor Moon, 3:00 PM, 2 guests" in page_markup
     assert all("existing operations graph" not in item.value for item in app.info)
+
+
+def test_quick_prompt_is_displayed_with_its_answer() -> None:
+    app = render_app()
+
+    app = app.button(key="quick_prompt_Who's checking in?").click().run()
+
+    assert app.exception == []
+    controller = app.session_state["stayops_controller"]
+    assert controller.last_query == "Which guests are arriving today?"
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert "You asked" in page_markup
+    assert "“Which guests are arriving today?”" in page_markup
+
+
+def test_latest_question_replaces_the_previous_question_in_answer_card() -> None:
+    app = render_app()
+    first_query = "Which guests are arriving today?"
+    second_query = "Which guest messages need a reply today?"
+
+    app.text_input[0].input(first_query)
+    app = app.button(key="FormSubmitter:ask_stayops-Ask StayOps").click().run()
+    app.text_input[0].input(second_query)
+    app = app.button(key="FormSubmitter:ask_stayops-Ask StayOps").click().run()
+
+    assert app.exception == []
+    page_markup = "\n".join(item.value for item in app.markdown)
+    assert f"“{second_query}”" in page_markup
+    assert f"“{first_query}”" not in page_markup
 
 
 def test_agent_activity_rail_is_ready_before_a_user_request() -> None:
