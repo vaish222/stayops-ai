@@ -68,26 +68,29 @@ StayOps currently manages four operational areas across eight synthetic properti
 
 ---
 
-# Project Structure
+## Project Structure
 
 ```text
 stayops-ai/
 │
 ├── app.py
+├── architecture.md
 ├── pyproject.toml
+├── product_requirements.md
 ├── README.md
 ├── .env.example
 │
 ├── data/
+│   └── runtime/
 │
 ├── src/
 │   ├── agents/
-│   ├── config/
 │   ├── evaluation/
 │   ├── graph/
 │   ├── llm/
 │   ├── models/
 │   ├── safety/
+│   ├── time_context.py
 │   ├── tools/
 │   └── ui/
 │
@@ -97,7 +100,7 @@ stayops-ai/
 
 ---
 
-# Architecture
+## Architecture
 
 StayOps is built as a stateful LangGraph workflow rather than a single LLM call.
 
@@ -162,7 +165,7 @@ Every approved write receives a one-time capability bound to the exact request, 
 
 ---
 
-# Failure Handling
+## Failure Handling
 
 A multi-agent system should not work only on the happy path.
 StayOps read tools support controlled failure simulation.
@@ -205,7 +208,7 @@ Unavailable source data is never treated as an all-clear. Persistent read failur
 
 ---
 
-# Tech Stack
+## Tech Stack
 
 | Layer              | Technology             |
 | ------------------ | ---------------------- |
@@ -224,15 +227,15 @@ Unavailable source data is never treated as an all-clear. Persistent read failur
 
 ---
 
-# Running Locally
+## Running Locally
 
 uv sync
 
-# Run StayOps with deterministic synthesis
+### Run StayOps with deterministic synthesis
 
 SYNTHESIZER_MODE=deterministic uv run streamlit run app.py
 
-# Run with Ollama
+### Run with Ollama
 
 Make sure Ollama is running and the configured model is available.
 
@@ -242,7 +245,7 @@ LLM_MODEL=<your-model>
 
 uv run streamlit run app.py
 
-# Run with Nebius
+### Run with Nebius
 
 Configure the required environment variables:
 
@@ -256,7 +259,7 @@ uv run streamlit run app.py
 
 Never commit API keys to the repository.
 
-# LLM Synthesizer Comparison
+## LLM Synthesizer Comparison
 
 StayOps was evaluated with deterministic synthesis, local Ollama synthesis,
 and hosted Nebius synthesis. Each option ran the same nine controlled scenarios
@@ -292,19 +295,10 @@ set +a
 uv run python -m src.evaluation.provider_comparison --runs 5
 ```
 
-# Running Tests
+## Running Tests
 
 uv run pytest
 
-# Project Goal
-
-Project Goal
+## Project Goal
 
 StayOps AI succeeds when a self-managing host can move from scattered property operations to one prioritized view of what needs attention—while the system handles safe analysis autonomously, fails safely when information is missing, and never takes a consequential action without human approval.
-
-
-### Why I prefer this version
-
-It tells the project story in this order:
-
-**Problem → product → architecture → why multi-agent → real scenario → HITL → failures → LLM decision → evaluation → tech.**
