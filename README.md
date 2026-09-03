@@ -89,6 +89,7 @@ stayops-ai/
 │   ├── graph/
 │   ├── llm/
 │   ├── models/
+│   ├── observability/
 │   ├── safety/
 │   ├── time_context.py
 │   ├── tools/
@@ -96,6 +97,7 @@ stayops-ai/
 │   └── voice/
 │
 ├── evaluation/
+│   └── week4/
 └── tests/
 ```
 
@@ -224,6 +226,7 @@ Unavailable source data is never treated as an all-clear. Persistent read failur
 | Hosted LLM         | Nebius                 |
 | Local LLM          | Ollama                 |
 | Voice interface    | ElevenLabs (optional)  |
+| Observability      | LangSmith (optional)   |
 | UI                 | Streamlit              |
 | Package Management | uv                     |
 | Testing            | pytest                 |
@@ -315,6 +318,45 @@ VOICE_MAX_SECONDS=30
 Export `.env` before starting Streamlit as shown above. Voice is available only in **Ask StayOps**. It cannot approve, reject, or resume a human-review action; approvals remain on-screen only.
 
 Never commit API keys to the repository.
+
+### Trace the Week 4 STAY-001 baseline with LangSmith
+
+LangSmith tracing is opt-in and does not change router, specialist, synthesis,
+safety, human-review, tool, or UI behavior. The first case intentionally keeps
+the exact baseline query `Who is checking in tomorrow?` with a fixed reference
+date of September 2, 2026.
+
+Add the following configuration to `.env`:
+
+```bash
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY="replace-with-langsmith-api-key"
+LANGSMITH_PROJECT=stayops-week4-eval
+```
+
+If the API key belongs to multiple workspaces, also set
+`LANGSMITH_WORKSPACE_ID`. Accounts using a non-US LangSmith region should set
+the corresponding `LANGSMITH_ENDPOINT`.
+
+Export the environment and run the single case:
+
+```bash
+set -a
+source .env
+set +a
+uv run python -m src.evaluation.langsmith_runner
+```
+
+The runner creates one root trace named `StayOps Evaluation Run`, prints the
+expected-versus-actual baseline, and saves its run and trace identifiers to
+`evaluation/results/langsmith/stay_001_baseline.json`. LangGraph nodes appear as
+child runs, and each read-tool attempt is recorded as a child tool span.
+
+STAY-001 is expected to expose a current baseline mismatch: the exact phrase
+`checking in` falls back to `general_operations`, activates all four specialists,
+and can pause for human review. The runner reports these differences without
+changing the query or modifying graph output. This is deliberate; router and
+specialist improvements belong to a later post-baseline pass.
 
 ## LLM Synthesizer Comparison
 
