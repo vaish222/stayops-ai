@@ -19,6 +19,7 @@ from src.agents import (
     TurnoverAgent,
 )
 from src.models import SpecialistName, SpecialistOutput
+from src.observability import trace_read_tool_call
 from src.graph.routing import request_router_node
 from src.graph.state import AgentRunLog, StayOpsState, WorkflowError
 from src.tools import (
@@ -111,7 +112,11 @@ def _run_read_with_retry(
     while attempts < 2:
         attempts += 1
         try:
-            result = call()
+            result = trace_read_tool_call(
+                tool_name.value,
+                attempts,
+                call,
+            )
         except Exception as exc:  # Defensive boundary around each independent source.
             return None, attempts, WorkflowError(
                 stage="context_loading",

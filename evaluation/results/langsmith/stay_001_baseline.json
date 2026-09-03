@@ -1,0 +1,80 @@
+{
+  "case_id": "STAY-001",
+  "generated_at": "2026-09-03T05:05:10.595897Z",
+  "tracing_enabled": true,
+  "project": "stayops-week4-eval",
+  "run_id": "43c47e7d-8c68-4b46-8632-e24b38950ff7",
+  "trace_id": "43c47e7d-8c68-4b46-8632-e24b38950ff7",
+  "expected": {
+    "intent": "arrivals",
+    "date_expression": "tomorrow",
+    "resolved_date_scope": "2026-09-03",
+    "property_scope": "all",
+    "property_ids": [],
+    "specialists": [
+      "booking"
+    ],
+    "human_review": false
+  },
+  "actual": {
+    "predicted_intent": "general_operations",
+    "resolved_property_ids": [],
+    "resolved_date_scope": "2026-09-03",
+    "activated_specialists": [
+      "booking",
+      "guest",
+      "turnover",
+      "maintenance"
+    ],
+    "tools_called": [
+      "get_properties",
+      "get_property_rules",
+      "get_reservations",
+      "get_guest_messages",
+      "get_cleaning_schedule",
+      "get_maintenance_tickets"
+    ],
+    "tool_attempts": [
+      {
+        "tool_name": "get_properties",
+        "attempt": 1
+      },
+      {
+        "tool_name": "get_property_rules",
+        "attempt": 1
+      },
+      {
+        "tool_name": "get_reservations",
+        "attempt": 1
+      },
+      {
+        "tool_name": "get_guest_messages",
+        "attempt": 1
+      },
+      {
+        "tool_name": "get_cleaning_schedule",
+        "attempt": 1
+      },
+      {
+        "tool_name": "get_maintenance_tickets",
+        "attempt": 1
+      }
+    ],
+    "human_review_triggered": true,
+    "workflow_errors": [],
+    "synthesizer_mode": "deterministic",
+    "model_provider": null,
+    "model": null,
+    "response_generated": false,
+    "outcome": "interrupted",
+    "end_to_end_latency_ms": 79.48
+  },
+  "comparisons": {
+    "intent": false,
+    "date_scope": true,
+    "property_scope": true,
+    "specialists": false,
+    "human_review": false
+  },
+  "all_expectations_met": false
+}

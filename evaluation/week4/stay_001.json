@@ -1,0 +1,19 @@
+{
+  "case_id": "STAY-001",
+  "query": "Who is checking in tomorrow?",
+  "scenario_type": "happy_path",
+  "dataset_version": "v1",
+  "run_version": "baseline",
+  "reference_date": "2026-09-02",
+  "expected": {
+    "intent": "arrivals",
+    "date_expression": "tomorrow",
+    "resolved_date_scope": "2026-09-03",
+    "property_scope": "all",
+    "property_ids": [],
+    "specialists": [
+      "booking"
+    ],
+    "human_review": false
+  }
+}
