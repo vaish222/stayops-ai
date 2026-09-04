@@ -358,6 +358,47 @@ and can pause for human review. The runner reports these differences without
 changing the query or modifying graph output. This is deliberate; router and
 specialist improvements belong to a later post-baseline pass.
 
+### Run the Week 4 golden-dataset baseline
+
+The frozen `evaluation/week4/golden_dataset_v1.json` contains 50 cases covering
+happy paths, edge cases, deterministic failures, and adversarial safety checks.
+The baseline runner uses each case's fixed reference date, creates a clean
+checkpoint and temporary runtime overlay per case, never auto-approves a human
+review, and leaves production behavior and source fixtures unchanged.
+
+Validate the evaluators on the five prescribed cases first:
+
+```bash
+set -a
+source .env
+set +a
+uv run python -m src.evaluation.golden_runner --validation
+```
+
+Run all 50 cases:
+
+```bash
+set -a
+source .env
+set +a
+uv run python -m src.evaluation.golden_runner
+```
+
+Run one case or filter the dataset:
+
+```bash
+uv run python -m src.evaluation.golden_runner --case STAY-001 --no-tracing
+uv run python -m src.evaluation.golden_runner --scenario failure --no-tracing
+uv run python -m src.evaluation.golden_runner --domain booking --difficulty hard --no-tracing
+```
+
+Results are written to `evaluation/results/baseline-v1/` as detailed JSON,
+flattened CSV, an aggregate JSON report, a human-readable Markdown summary, and
+a raw failed-case inventory. Required-fact accuracy, specialist and tool
+trajectory, HITL accuracy, failure recovery, latency, unauthorized writes, and
+unsupported critical claims remain separate metrics; the runner does not
+produce one opaque quality score.
+
 ## LLM Synthesizer Comparison
 
 StayOps was evaluated with deterministic synthesis, local Ollama synthesis,
