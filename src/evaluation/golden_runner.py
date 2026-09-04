@@ -390,6 +390,13 @@ def run_golden_case(
                 root.add_metadata(
                     {
                         "actual_intent": actual.actual_intent,
+                        "normalized_operation": state.get("normalized_operation"),
+                        "specialist_policy": state.get("selected_specialists", []),
+                        "write_intent_detected": bool(state.get("write_requested")),
+                        "readiness_detected": bool(state.get("readiness_detected")),
+                        "date_normalization_method": state.get(
+                            "date_normalization_method"
+                        ),
                         "actual_specialists": actual.specialists_actually_run,
                         "actual_human_review": actual.human_review_triggered,
                         "case_pass": result.case_pass,
@@ -494,8 +501,13 @@ def _format_percent(value: float | None) -> str:
 def render_summary_markdown(summary: dict[str, Any]) -> str:
     metrics = summary["metrics"]
     latency = metrics["latency_ms"]
+    run_label = (
+        "Improved"
+        if str(summary["run_version"]).startswith("improved")
+        else "Baseline"
+    )
     lines = [
-        "# StayOps Week 4 Baseline Summary",
+        f"# StayOps Week 4 {run_label} Summary",
         "",
         f"Dataset: `{summary['dataset_version']}`  ",
         f"Run: `{summary['run_version']}`  ",
@@ -540,9 +552,16 @@ def render_summary_markdown(summary: dict[str, Any]) -> str:
         lines.append("")
     lines.extend(
         [
-            "## Baseline discipline",
+            f"## {run_label} discipline",
             "",
-            "These results measure the existing StayOps implementation. No routing, agent, synthesis, safety, HITL, tool, fixture, or UI behavior was changed to improve scores.",
+            (
+                "These results measure the approved H1–H4 implementation against "
+                "the unchanged golden dataset and scoring rules."
+                if run_label == "Improved"
+                else "These results measure the existing StayOps implementation. "
+                "No routing, agent, synthesis, safety, HITL, tool, fixture, or UI "
+                "behavior was changed to improve scores."
+            ),
             "",
         ]
     )
@@ -551,7 +570,12 @@ def render_summary_markdown(summary: dict[str, Any]) -> str:
 
 def render_failure_cases(results: GoldenRunResults) -> str:
     failed = [case for case in results.cases if not case.case_pass]
-    lines = ["# StayOps Week 4 Failed Baseline Cases", ""]
+    run_label = (
+        "Improved"
+        if results.run_version.startswith("improved")
+        else "Baseline"
+    )
+    lines = [f"# StayOps Week 4 Failed {run_label} Cases", ""]
     if not failed:
         return "\n".join(lines + ["No cases failed.", ""])
     for case in failed:
@@ -641,6 +665,11 @@ def save_results(
 ) -> None:
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
+    summary_stem = (
+        "improved_summary"
+        if results.run_version.startswith("improved")
+        else "baseline_summary"
+    )
     case_payloads = [case.model_dump(mode="json") for case in results.cases]
     (destination / "case_results.json").write_text(
         json.dumps(case_payloads, indent=2) + "\n",
@@ -651,11 +680,11 @@ def save_results(
         writer = csv.DictWriter(target, fieldnames=list(rows[0]) if rows else ["case_id"])
         writer.writeheader()
         writer.writerows(rows)
-    (destination / "baseline_summary.json").write_text(
+    (destination / f"{summary_stem}.json").write_text(
         json.dumps(summary, indent=2) + "\n",
         encoding="utf-8",
     )
-    (destination / "baseline_summary.md").write_text(
+    (destination / f"{summary_stem}.md").write_text(
         render_summary_markdown(summary),
         encoding="utf-8",
     )

@@ -413,7 +413,7 @@ def test_nebius_never_uses_an_openai_api_key_as_its_credential() -> None:
         )
 
 
-def test_graph_requires_review_when_llm_fails_and_fallback_is_disabled() -> None:
+def test_graph_reports_warning_when_llm_fails_and_fallback_is_disabled() -> None:
     runner, _ = llm_runner(
         error=ConnectionError("down"),
         fallback=LLMSynthesizerFallback.DISABLED,
@@ -425,7 +425,7 @@ def test_graph_requires_review_when_llm_fails_and_fallback_is_disabled() -> None
     assert result["analysis_complete"] is False
     assert result["synthesis_complete"] is False
     assert result["synthesis_run"]["status"] == "failed"
-    assert result["requires_human_review"] is True
+    assert result["requires_human_review"] is False
     assert ReviewReasonCode.SYNTHESIS_UNAVAILABLE.value in {
-        reason["code"] for reason in result["review_reasons"]
+        warning["code"] for warning in result["operational_warnings"]
     }

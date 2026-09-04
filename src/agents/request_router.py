@@ -8,7 +8,12 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.time_context import current_operating_date, resolve_date_scope
+from src.agents.request_operation import RequestOperation, classify_request_operation
+from src.time_context import (
+    DateNormalizationMethod,
+    current_operating_date,
+    resolve_date_scope_details,
+)
 
 
 class RequestIntent(StrEnum):
@@ -44,6 +49,9 @@ class RequestRoute(BaseModel):
     property_scope: list[str]
     date_scope: str | None
     write_requested: bool
+    normalized_operation: RequestOperation = RequestOperation.GENERAL
+    readiness_detected: bool = False
+    date_normalization_method: DateNormalizationMethod = DateNormalizationMethod.NONE
 
     @field_validator("property_scope")
     @classmethod
@@ -136,8 +144,13 @@ WRITE_PATTERNS: tuple[str, ...] = (
     r"\b(?:modify|change|cancel|update|assign|reschedule)\b",
     r"\bschedule\s+(?:a\s+|an\s+|the\s+)?(?:cleaner|cleaning|repair|visit|turnover)\b",
     r"\b(?:approve|reject)\b",
-    r"\b(?:handle|fix|resolve|close|reopen)\b.{0,40}\b(?:issue|ticket|problem|cleaning|reservation)\b",
+    (
+        r"\b(?:handle|fix|resolve|close|reopen)\b.{0,40}"
+        r"\b(?:issue|ticket|problem|cleaning|reservation)\b"
+    ),
     r"\b(?:fix|repair)\s+(?:the\s+)?(?:ac|air conditioner|hvac|leak|plumbing|appliance)\b",
+    r"\bmark\b.{0,50}\b(?:resolved|closed|open|in[-_ ]progress|complete(?:d)?)\b",
+    r"\bset\b.{0,50}\bstatus\s+to\b",
 )
 
 
@@ -157,12 +170,17 @@ class RequestRouter:
         router_input = RouterInput(host_query=host_query)
         normalized_query = router_input.host_query.casefold()
         today = reference_date or current_operating_date()
+        operation = classify_request_operation(normalized_query)
+        date_resolution = resolve_date_scope_details(normalized_query, today)
 
         return RequestRoute(
-            intent=self._extract_intent(normalized_query),
+            intent=self._extract_intent(normalized_query, operation),
             property_scope=self._extract_property_scope(normalized_query),
-            date_scope=resolve_date_scope(normalized_query, today),
+            date_scope=date_resolution.scope,
             write_requested=self._extract_write_requested(normalized_query),
+            normalized_operation=operation,
+            readiness_detected=operation == RequestOperation.PROPERTY_READINESS,
+            date_normalization_method=date_resolution.method,
         )
 
     def _extract_property_scope(self, query: str) -> list[str]:
@@ -174,7 +192,33 @@ class RequestRouter:
         return [property_id for _, property_id in sorted(matches)]
 
     @staticmethod
-    def _extract_intent(query: str) -> RequestIntent:
+    def _extract_intent(
+        query: str,
+        operation: RequestOperation | None = None,
+    ) -> RequestIntent:
+        resolved_operation = operation or classify_request_operation(query)
+        if (
+            resolved_operation == RequestOperation.PROPERTY_READINESS
+            and re.search(r"\b(?:good for|good to go)\b", query)
+        ):
+            return RequestIntent.RISK_ASSESSMENT
+        if (
+            resolved_operation == RequestOperation.TURNOVER_TIMING
+            and re.search(r"\banything\b.{0,40}\bhandle\b", query)
+        ):
+            return RequestIntent.GENERAL_OPERATIONS
+        operation_intents = {
+            RequestOperation.BOOKING_LOOKUP: RequestIntent.BOOKING_OPERATIONS,
+            RequestOperation.GUEST_MESSAGES: RequestIntent.GUEST_COMMUNICATIONS,
+            RequestOperation.CLEANER_STATUS: RequestIntent.TURNOVER_OPERATIONS,
+            RequestOperation.TURNOVER_TIMING: RequestIntent.TURNOVER_OPERATIONS,
+            RequestOperation.MAINTENANCE_LOOKUP: RequestIntent.MAINTENANCE_OPERATIONS,
+            RequestOperation.PROPERTY_READINESS: RequestIntent.TURNOVER_OPERATIONS,
+            RequestOperation.PORTFOLIO_BRIEFING: RequestIntent.DAILY_BRIEFING,
+            RequestOperation.BROAD_RISK: RequestIntent.RISK_ASSESSMENT,
+        }
+        if resolved_operation in operation_intents:
+            return operation_intents[resolved_operation]
         for intent, patterns in INTENT_PATTERNS:
             if any(re.search(pattern, query) for pattern in patterns):
                 return intent

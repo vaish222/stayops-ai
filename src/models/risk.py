@@ -88,9 +88,14 @@ class HumanReviewReason(StrictModel):
         return values
 
 
+class OperationalWarning(HumanReviewReason):
+    """Non-blocking risk signal shown to the host without opening approval."""
+
+
 class RiskGateOutput(StrictModel):
     requires_human_review: bool
     reasons: list[HumanReviewReason]
+    advisories: list[OperationalWarning] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def review_flag_must_match_reasons(self) -> RiskGateOutput:
@@ -102,4 +107,10 @@ class RiskGateOutput(StrictModel):
         ]
         if len(keys) != len(set(keys)):
             raise ValueError("review reasons must be unique")
+        advisory_keys = [
+            (warning.code, tuple(warning.source_ids), tuple(warning.property_ids))
+            for warning in self.advisories
+        ]
+        if len(advisory_keys) != len(set(advisory_keys)):
+            raise ValueError("operational warnings must be unique")
         return self

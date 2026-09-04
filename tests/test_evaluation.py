@@ -81,8 +81,9 @@ def test_tool_failures_show_retry_recovery_and_safe_escalation() -> None:
     assert persistent_metric.observed["unavailable_sources"] == [
         "get_guest_messages"
     ]
-    assert persistent_metric.observed["requires_human_review"] is True
-    assert persistent_metric.observed["review_reason_codes"] == [
+    assert persistent_metric.observed["requires_human_review"] is False
+    assert persistent_metric.observed["review_reason_codes"] == []
+    assert persistent_metric.observed["operational_warning_codes"] == [
         "source_data_unavailable"
     ]
     assert persistent_metric.observed["fabricated_claims"] == []

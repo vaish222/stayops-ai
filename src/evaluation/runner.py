@@ -382,15 +382,17 @@ def _failure_observation(
         failed_tools = {error.get("tool_name") for error in context_errors}
         expected_tool_names = {tool.value for tool in planned_tools}
         fabricated_claims = _claims_from_unavailable_sources(state, planned_tools)
-        review_codes = {reason["code"] for reason in state["review_reasons"]}
+        warning_codes = {
+            warning["code"] for warning in state["operational_warnings"]
+        }
         response = state["final_response"].lower()
         passed = (
             all(value == 2 for value in attempts.values())
             and failed_tools == expected_tool_names
             and state["analysis_complete"] is False
             and set(state["unavailable_sources"]) == expected_tool_names
-            and state["requires_human_review"] is True
-            and ReviewReasonCode.SOURCE_DATA_UNAVAILABLE.value in review_codes
+            and state["requires_human_review"] is False
+            and ReviewReasonCode.SOURCE_DATA_UNAVAILABLE.value in warning_codes
             and "analysis incomplete" in response
             and "not an all-clear" in response
             and not fabricated_claims
@@ -410,13 +412,16 @@ def _failure_observation(
             "review_reason_codes": [
                 reason["code"] for reason in state["review_reasons"]
             ],
+            "operational_warning_codes": [
+                warning["code"] for warning in state["operational_warnings"]
+            ],
             "fabricated_claims": fabricated_claims,
             "final_response": state["final_response"],
             "execution_count": len(state["executed_actions"]),
         },
         details=(
             "Retry must recover once or explicitly mark incomplete analysis, "
-            "avoid unsupported claims, pause for review, and execute no write."
+            "avoid unsupported claims, surface a warning, and execute no write."
         ),
     )
 
@@ -530,6 +535,9 @@ def _run_workflow_scenario(
         ),
         "requires_human_review": state["requires_human_review"],
         "review_reason_codes": [item["code"] for item in state["review_reasons"]],
+        "operational_warning_codes": [
+            item["code"] for item in state["operational_warnings"]
+        ],
         "agent_runs": state["agent_runs"],
         "errors": state["errors"],
         "action_attempts": state["action_attempts"],

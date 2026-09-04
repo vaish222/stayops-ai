@@ -190,9 +190,10 @@ proposed next actions.
     send_message -> HUMAN APPROVAL
     modify_reservation -> HUMAN APPROVAL
     update_record -> HUMAN APPROVAL
-    HIGH maintenance severity -> HUMAN REVIEW
-    low confidence -> HUMAN REVIEW
-    conflicting specialist findings -> HUMAN REVIEW
+    HIGH maintenance severity -> OPERATIONAL WARNING
+    low confidence -> OPERATIONAL WARNING
+    conflicting specialist findings -> OPERATIONAL WARNING
+    unavailable source or synthesis -> OPERATIONAL WARNING
 
 Hard safety and approval rules should use deterministic Python rather
 than an LLM.
@@ -324,11 +325,13 @@ confirmation.
 
 ## Phase 6 - Risk / Action Gate
 
-Add a deterministic Python gate. Human review is required for message
-sends, reservation modifications, record updates, high-severity
-maintenance, low confidence, or conflicting specialist findings. Do not
-use an LLM. Return requires_human_review and explicit reasons. Unit-test
-every rule.
+Add a deterministic Python gate. Human approval is required only when
+the host explicitly requests a message send, reservation modification,
+or record update. High-severity maintenance, low confidence,
+conflicting findings, and incomplete source or synthesis results remain
+visible as non-blocking operational warnings. Do not use an LLM. Return
+requires_human_review, explicit approval reasons, and operational
+warnings. Unit-test every rule.
 
 ## Phase 7 - Human-in-the-Loop
 

@@ -111,33 +111,24 @@ def test_stay_001_records_current_mismatches_without_network_calls() -> None:
     assert result.tracing_enabled is False
     assert result.run_id == ROOT_RUN_ID
     assert result.trace_id == ROOT_RUN_ID
-    assert result.actual.predicted_intent == "general_operations"
+    assert result.actual.predicted_intent == "booking_operations"
     assert result.actual.resolved_date_scope == "2026-09-03"
     assert result.actual.resolved_property_ids == []
-    assert result.actual.activated_specialists == [
-        "booking",
-        "guest",
-        "turnover",
-        "maintenance",
-    ]
+    assert result.actual.activated_specialists == ["booking"]
     assert result.actual.tools_called == [
         "get_properties",
-        "get_property_rules",
         "get_reservations",
-        "get_guest_messages",
-        "get_cleaning_schedule",
-        "get_maintenance_tickets",
     ]
-    assert result.actual.human_review_triggered is True
-    assert result.actual.outcome == "interrupted"
-    assert result.actual.response_generated is False
+    assert result.actual.human_review_triggered is False
+    assert result.actual.outcome == "completed"
+    assert result.actual.response_generated is True
     assert result.actual.workflow_errors == []
     assert result.comparisons == {
         "intent": False,
         "date_scope": True,
         "property_scope": True,
-        "specialists": False,
-        "human_review": False,
+        "specialists": True,
+        "human_review": True,
     }
     assert result.all_expectations_met is False
 
@@ -155,7 +146,7 @@ def test_baseline_summary_treats_mismatches_as_observations() -> None:
     assert "STAY-001 · untouched baseline" in summary
     assert "FAIL Intent" in summary
     assert "PASS Date scope" in summary
-    assert "Workflow outcome: interrupted" in summary
+    assert "Workflow outcome: completed" in summary
     assert "Baseline expectations met: false" in summary
 
 
@@ -174,4 +165,4 @@ def test_local_result_preserves_run_and_trace_identifiers(tmp_path) -> None:
     assert payload["run_id"] == str(ROOT_RUN_ID)
     assert payload["trace_id"] == str(ROOT_RUN_ID)
     assert payload["expected"]["intent"] == "arrivals"
-    assert payload["actual"]["predicted_intent"] == "general_operations"
+    assert payload["actual"]["predicted_intent"] == "booking_operations"

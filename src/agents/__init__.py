@@ -18,6 +18,11 @@ from src.agents.request_router import (
     RequestRouter,
     RouterInput,
 )
+from src.agents.request_operation import (
+    RequestOperation,
+    classify_request_operation,
+    specialists_for_operation,
+)
 from src.agents.response_generator import ResponseGenerator
 from src.agents.turnover import TurnoverAgent
 
@@ -30,9 +35,12 @@ __all__ = [
     "MaintenanceAgent",
     "OperationsSynthesizer",
     "RequestIntent",
+    "RequestOperation",
     "RequestRoute",
     "RequestRouter",
     "ResponseGenerator",
     "RouterInput",
+    "classify_request_operation",
+    "specialists_for_operation",
     "TurnoverAgent",
 ]

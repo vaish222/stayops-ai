@@ -13,7 +13,7 @@ from src.models import HumanReviewResponse, ReviewDecision
 
 
 REFERENCE_DATE = date(2026, 8, 28)
-REVIEW_QUERY = "What needs my attention today?"
+REVIEW_QUERY = "Send the cleaner at Lake House a message today."
 SAFE_QUERY = "Which guests are arriving at City Loft today?"
 
 

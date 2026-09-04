@@ -96,7 +96,7 @@ def test_percentile_95_uses_nearest_rank() -> None:
     assert percentile_95(list(range(1, 21))) == 19
 
 
-def test_stay_001_records_baseline_mismatches_and_matches_required_facts() -> None:
+def test_stay_001_matches_the_improved_minimal_trajectory() -> None:
     result = run_golden_case(
         _case("STAY-001"),
         settings=DISABLED_TRACING,
@@ -104,12 +104,12 @@ def test_stay_001_records_baseline_mismatches_and_matches_required_facts() -> No
     )
 
     assert result.expected.intent.value == "booking_operations"
-    assert result.actual.actual_intent == "general_operations"
+    assert result.actual.actual_intent == "booking_operations"
     assert result.scores["required_fact_recall"].score == 1.0
-    assert result.scores["specialist_precision"].score == 0.25
-    assert result.scores["tool_precision"].score == pytest.approx(2 / 6, abs=0.0001)
-    assert result.scores["human_review_correct"].passed is False
-    assert result.case_pass is False
+    assert result.scores["specialist_precision"].score == 1.0
+    assert result.scores["tool_precision"].score == 1.0
+    assert result.scores["human_review_correct"].passed is True
+    assert result.case_pass is True
 
 
 def test_retry_case_records_two_attempts_and_safe_recovery() -> None:
@@ -188,7 +188,7 @@ def test_aggregate_preserves_nulls_and_counts_hard_guardrails() -> None:
 
 
 def test_reports_include_required_files_and_human_readable_sections(tmp_path: Path) -> None:
-    case = run_golden_case(_case("STAY-001"), settings=DISABLED_TRACING)
+    case = run_golden_case(_case("STAY-027"), settings=DISABLED_TRACING)
     from src.evaluation.golden_contracts import GoldenRunResults
 
     results = GoldenRunResults(
@@ -210,9 +210,33 @@ def test_reports_include_required_files_and_human_readable_sections(tmp_path: Pa
         "baseline_summary.md",
         "failure_cases.md",
     }
-    assert json.loads((tmp_path / "case_results.json").read_text())[0]["case_id"] == "STAY-001"
+    assert json.loads((tmp_path / "case_results.json").read_text())[0]["case_id"] == "STAY-027"
     assert "Operational Decision Accuracy" in render_summary_markdown(summary)
-    assert "STAY-001" in render_failure_cases(results)
+    assert "STAY-027" in render_failure_cases(results)
+
+
+def test_improved_run_uses_distinct_summary_names(tmp_path: Path) -> None:
+    case = run_golden_case(
+        _case("STAY-001"),
+        settings=DISABLED_TRACING,
+        run_version="improved-v1",
+    )
+    from src.evaluation.golden_contracts import GoldenRunResults
+
+    results = GoldenRunResults(
+        dataset_version="v1",
+        run_version="improved-v1",
+        synthesizer_mode="deterministic",
+        dataset_sha256=FROZEN_DATASET_SHA256,
+        generated_at=datetime(2026, 9, 3, tzinfo=UTC),
+        cases=[case],
+    )
+
+    save_results(results, build_summary(results), tmp_path)
+
+    assert (tmp_path / "improved_summary.json").exists()
+    assert (tmp_path / "improved_summary.md").exists()
+    assert not (tmp_path / "baseline_summary.json").exists()
 
 
 def test_validation_inventory_and_output_contract() -> None:

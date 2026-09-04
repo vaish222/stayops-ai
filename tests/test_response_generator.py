@@ -117,15 +117,15 @@ def test_daily_attention_answer_lists_needs_action_before_watch_items() -> None:
 def test_turnover_answer_leads_with_timing_and_confirmation_risk() -> None:
     state, answer = answer_for("What cleaning risks need attention today?")
 
-    assert state["intent"] == "risk_assessment"
+    assert state["intent"] == "turnover_operations"
     assert answer.splitlines()[0] == (
-        "3 properties have a cleaning or turnover risk on Aug 28."
+        "1 property has a cleaning or turnover risk on Aug 28."
     )
     assert "Checkout 11:00 AM" in answer
     assert "cleaning target 2:00 PM" in answer
     assert "next check-in 4:00 PM" in answer
     assert "confirmation pending" in answer
-    assert "Waiting for approval:" in answer
+    assert "Waiting for approval:" not in answer
     assert_user_facing(answer)
 
 
@@ -137,8 +137,7 @@ def test_guest_message_answer_names_waiting_guest_and_exact_approval() -> None:
     assert "**Morgan Frost · Pine House**" in answer
     assert "High urgency" in answer
     assert "air conditioner stopped cooling" in answer
-    assert "Waiting for approval: send" in answer
-    assert "to Morgan Frost" in answer
+    assert "No reply is waiting for approval." in answer
     assert_user_facing(answer)
 
 

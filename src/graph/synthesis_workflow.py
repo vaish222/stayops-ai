@@ -38,6 +38,7 @@ from src.models import (
 )
 from src.tools import FailureSimulator, SimulatedOperationsStore
 from src.tools.read_tools import DEFAULT_DATA_DIR
+from src.safety import enforce_readiness_status
 
 
 class SynthesisRunner(Protocol):
@@ -156,7 +157,11 @@ def operations_synthesizer_node(
             f"{response}"
         )
     update: dict[str, Any] = {
-        "overall_status": output.overall_status.value,
+        "overall_status": enforce_readiness_status(
+            normalized_operation=state["normalized_operation"],
+            unavailable_sources=state["unavailable_sources"],
+            overall_status=output.overall_status.value,
+        ),
         "action_proposed": output.action_proposed,
         "operational_findings": serialized_findings,
         "priority_items": [

@@ -167,7 +167,7 @@ def _action_for_finding(
 
 
 def _approval_copy(state: dict[str, Any], action: dict[str, Any] | None) -> str | None:
-    if action is None:
+    if action is None or not state.get("requires_human_review", False):
         return None
     description = action.get("description", "Review the proposed action.")
     target_id = action.get("target_record_id")
@@ -255,7 +255,8 @@ def _secondary_heads_up(
     ]
     if not state.get("analysis_complete", True):
         notes.append(
-            "- Some operational data could not be checked, so this answer may be incomplete."
+            "- Analysis incomplete: some operational data could not be checked, "
+            "so this is not an all-clear."
         )
     return "\n\n### Heads up\n" + "\n".join(notes) if notes else ""
 
@@ -331,7 +332,8 @@ def _daily_attention_response(state: dict[str, Any]) -> str:
         )
     if not state.get("analysis_complete", True):
         heads_up.append(
-            "- Some operational data could not be checked, so this answer may be incomplete."
+            "- Analysis incomplete: some operational data could not be checked, "
+            "so this is not an all-clear."
         )
     if heads_up:
         answer += "\n\n### Heads up\n" + "\n".join(heads_up)
@@ -504,7 +506,11 @@ def _property_status_response(state: dict[str, Any]) -> str:
         default=0,
     )
     if not state.get("analysis_complete", True):
-        answer = f"{name} is at risk because some required operational data could not be checked."
+        answer = (
+            f"{name} is at risk because the readiness analysis is incomplete; "
+            "some required operational data could not be checked. This is not an "
+            "all-clear."
+        )
     elif highest_severity >= 3:
         summary = _human_summary(findings[0]["summary"]).rstrip(".").lower()
         answer = f"{name} needs action because {summary}."

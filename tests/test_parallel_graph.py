@@ -80,7 +80,7 @@ def test_guest_query_loads_and_runs_only_guest_context() -> None:
 def test_turnover_query_loads_scoped_booking_and_cleaning_context() -> None:
     result = invoke_graph("Handle the cleaning issue at Lake House today.")
 
-    assert set(result["selected_specialists"]) == {"booking", "turnover"}
+    assert result["selected_specialists"] == ["turnover"]
     assert set(result["property_context"]) == {"prop_lake_house"}
     assert set(result["reservation_context"]) == {"res_lake_001", "res_lake_002"}
     assert set(result["cleaning_context"]) == {"clean_lake_001"}
