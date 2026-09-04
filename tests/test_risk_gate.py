@@ -108,6 +108,10 @@ def reason_codes(output) -> list[ReviewReasonCode]:
     return [reason.code for reason in output.reasons]
 
 
+def advisory_codes(output) -> list[ReviewReasonCode]:
+    return [warning.code for warning in output.advisories]
+
+
 @pytest.mark.parametrize("safe_action", [ActionType.REVIEW, ActionType.DRAFT_MESSAGE])
 def test_safe_read_only_or_draft_actions_do_not_require_review(
     safe_action: ActionType,
@@ -129,21 +133,23 @@ def test_router_write_intent_requires_review_with_explicit_reason() -> None:
     assert output.reasons[0].source_ids == ["router:write_requested"]
 
 
-def test_unavailable_source_requires_review_with_explicit_reason() -> None:
+def test_unavailable_source_is_a_non_blocking_operational_warning() -> None:
     output = evaluate(unavailable_sources=["get_guest_messages"])
 
-    assert output.requires_human_review is True
-    assert reason_codes(output) == [ReviewReasonCode.SOURCE_DATA_UNAVAILABLE]
-    assert output.reasons[0].source_ids == ["get_guest_messages"]
-    assert "partial" in output.reasons[0].message
+    assert output.requires_human_review is False
+    assert reason_codes(output) == []
+    assert advisory_codes(output) == [ReviewReasonCode.SOURCE_DATA_UNAVAILABLE]
+    assert output.advisories[0].source_ids == ["get_guest_messages"]
+    assert "partial" in output.advisories[0].message
 
 
-def test_incomplete_synthesis_requires_review_with_explicit_reason() -> None:
+def test_incomplete_synthesis_is_a_non_blocking_operational_warning() -> None:
     output = evaluate(synthesis_complete=False)
 
-    assert output.requires_human_review is True
-    assert reason_codes(output) == [ReviewReasonCode.SYNTHESIS_UNAVAILABLE]
-    assert output.reasons[0].source_ids == ["operations_synthesizer"]
+    assert output.requires_human_review is False
+    assert reason_codes(output) == []
+    assert advisory_codes(output) == [ReviewReasonCode.SYNTHESIS_UNAVAILABLE]
+    assert output.advisories[0].source_ids == ["operations_synthesizer"]
 
 
 @pytest.mark.parametrize(
@@ -161,19 +167,19 @@ def test_each_write_action_requires_review(
     action_type: ActionType,
     expected_reason: ReviewReasonCode,
 ) -> None:
-    output = evaluate(actions=[make_action(action_type)])
+    output = evaluate(write_requested=True, actions=[make_action(action_type)])
 
     assert output.requires_human_review is True
-    assert reason_codes(output) == [expected_reason]
-    assert output.reasons[0].property_ids == ["prop_city_loft"]
-    assert output.reasons[0].source_ids[0] == f"action:{action_type.value}:test"
+    assert reason_codes(output) == [ReviewReasonCode.WRITE_REQUESTED, expected_reason]
+    assert output.reasons[1].property_ids == ["prop_city_loft"]
+    assert output.reasons[1].source_ids[0] == f"action:{action_type.value}:test"
 
 
 @pytest.mark.parametrize(
     "severity",
     [FindingSeverity.HIGH, FindingSeverity.CRITICAL],
 )
-def test_high_or_critical_maintenance_requires_review(
+def test_high_or_critical_maintenance_creates_an_operational_warning(
     severity: FindingSeverity,
 ) -> None:
     finding = make_finding(
@@ -185,8 +191,9 @@ def test_high_or_critical_maintenance_requires_review(
 
     output = evaluate(findings=[finding])
 
-    assert reason_codes(output) == [ReviewReasonCode.HIGH_MAINTENANCE_SEVERITY]
-    assert output.reasons[0].source_ids == [finding.finding_id]
+    assert output.requires_human_review is False
+    assert advisory_codes(output) == [ReviewReasonCode.HIGH_MAINTENANCE_SEVERITY]
+    assert output.advisories[0].source_ids == [finding.finding_id]
 
 
 def test_maintenance_rule_does_not_gate_medium_or_nonmaintenance_findings() -> None:
@@ -208,26 +215,26 @@ def test_maintenance_rule_does_not_gate_medium_or_nonmaintenance_findings() -> N
     assert evaluate(findings=findings).requires_human_review is False
 
 
-def test_confidence_below_threshold_requires_review() -> None:
+def test_confidence_below_threshold_creates_an_operational_warning() -> None:
     finding = make_finding(confidence=0.74)
 
     output = evaluate(findings=[finding])
 
-    assert reason_codes(output) == [ReviewReasonCode.LOW_CONFIDENCE]
-    assert "0.74" in output.reasons[0].message
-    assert "0.75" in output.reasons[0].message
+    assert advisory_codes(output) == [ReviewReasonCode.LOW_CONFIDENCE]
+    assert "0.74" in output.advisories[0].message
+    assert "0.75" in output.advisories[0].message
 
 
 def test_confidence_at_threshold_does_not_require_review() -> None:
     gate = RiskActionGate(RiskGateConfig(low_confidence_threshold=0.6))
 
     assert evaluate(findings=[make_finding(confidence=0.6)], gate=gate).reasons == []
-    assert reason_codes(
+    assert advisory_codes(
         evaluate(findings=[make_finding(confidence=0.59)], gate=gate)
     ) == [ReviewReasonCode.LOW_CONFIDENCE]
 
 
-def test_conflicting_findings_with_shared_evidence_require_review() -> None:
+def test_conflicting_findings_create_an_operational_warning() -> None:
     findings = [
         make_finding(
             finding_id="turnover:on-track:test",
@@ -246,8 +253,8 @@ def test_conflicting_findings_with_shared_evidence_require_review() -> None:
 
     output = evaluate(findings=findings)
 
-    assert reason_codes(output) == [ReviewReasonCode.CONFLICTING_FINDINGS]
-    assert set(output.reasons[0].source_ids) == {
+    assert advisory_codes(output) == [ReviewReasonCode.CONFLICTING_FINDINGS]
+    assert set(output.advisories[0].source_ids) == {
         "turnover:on-track:test",
         "booking:timing-risk:test",
     }
@@ -276,7 +283,7 @@ def test_findings_do_not_conflict_without_same_property_and_shared_evidence() ->
 
     output = evaluate(findings=[base, different_evidence, different_property])
 
-    assert ReviewReasonCode.CONFLICTING_FINDINGS not in reason_codes(output)
+    assert ReviewReasonCode.CONFLICTING_FINDINGS not in advisory_codes(output)
 
 
 def test_gate_aggregates_all_applicable_reasons_without_executing_actions() -> None:
@@ -298,13 +305,15 @@ def test_gate_aggregates_all_applicable_reasons_without_executing_actions() -> N
     assert reason_codes(output) == [
         ReviewReasonCode.WRITE_REQUESTED,
         ReviewReasonCode.RECORD_UPDATE,
+    ]
+    assert advisory_codes(output) == [
         ReviewReasonCode.HIGH_MAINTENANCE_SEVERITY,
         ReviewReasonCode.LOW_CONFIDENCE,
     ]
     assert action.executed is False
 
 
-def test_phase_6_graph_runs_gate_after_synthesis_for_high_maintenance() -> None:
+def test_phase_6_graph_reports_high_maintenance_without_opening_approval() -> None:
     graph = build_phase_6_graph(reference_date=REFERENCE_DATE)
 
     result = graph.invoke(
@@ -315,9 +324,9 @@ def test_phase_6_graph_runs_gate_after_synthesis_for_high_maintenance() -> None:
     )
 
     assert result["risk_gate_evaluated"] is True
-    assert result["requires_human_review"] is True
+    assert result["requires_human_review"] is False
     assert ReviewReasonCode.HIGH_MAINTENANCE_SEVERITY in {
-        reason["code"] for reason in result["review_reasons"]
+        warning["code"] for warning in result["operational_warnings"]
     }
     assert result["operational_findings"]
     assert result["executed_actions"] == []
@@ -339,7 +348,7 @@ def test_phase_6_graph_preserves_safe_read_only_path() -> None:
     assert result["executed_actions"] == []
 
 
-def test_phase_6_persistent_source_failure_is_explicitly_escalated() -> None:
+def test_phase_6_persistent_source_failure_is_explicitly_reported() -> None:
     simulator = FailureSimulator(
         SimulatedFailureConfig(
             failures_before_success={ReadToolName.GET_GUEST_MESSAGES: 2}
@@ -359,8 +368,9 @@ def test_phase_6_persistent_source_failure_is_explicitly_escalated() -> None:
 
     assert result["analysis_complete"] is False
     assert result["unavailable_sources"] == ["get_guest_messages"]
-    assert result["requires_human_review"] is True
-    assert [reason["code"] for reason in result["review_reasons"]] == [
+    assert result["requires_human_review"] is False
+    assert result["review_reasons"] == []
+    assert [warning["code"] for warning in result["operational_warnings"]] == [
         ReviewReasonCode.SOURCE_DATA_UNAVAILABLE
     ]
     assert result["guest_findings"] == []

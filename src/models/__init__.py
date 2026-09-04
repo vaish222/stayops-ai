@@ -41,6 +41,7 @@ from src.models.operations import (
 )
 from src.models.risk import (
     HumanReviewReason,
+    OperationalWarning,
     ReviewReasonCode,
     RiskGateConfig,
     RiskGateInput,
@@ -102,6 +103,7 @@ __all__ = [
     "MessageUrgency",
     "OperationsSynthesisInput",
     "OperationsSynthesisOutput",
+    "OperationalWarning",
     "OverallStatus",
     "Property",
     "PropertyRule",

@@ -71,6 +71,7 @@ def risk_gate_node(
         return {
             "requires_human_review": True,
             "review_reasons": [reason.model_dump(mode="json")],
+            "operational_warnings": [],
             "risk_gate_evaluated": False,
             "errors": [error],
         }
@@ -78,6 +79,9 @@ def risk_gate_node(
         "requires_human_review": output.requires_human_review,
         "review_reasons": [
             reason.model_dump(mode="json") for reason in output.reasons
+        ],
+        "operational_warnings": [
+            warning.model_dump(mode="json") for warning in output.advisories
         ],
         "risk_gate_evaluated": True,
     }

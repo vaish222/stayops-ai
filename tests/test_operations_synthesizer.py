@@ -64,7 +64,7 @@ def lake_phase_4_findings() -> list[dict]:
     graph = build_phase_4_graph(reference_date=REFERENCE_DATE)
     result = graph.invoke(
         create_initial_state(
-            "Handle the cleaning issue at Lake House today.",
+            "Is Lake House turnover ready for today's arrival?",
             request_id="phase-5-source",
         )
     )

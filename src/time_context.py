@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from enum import StrEnum
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
@@ -18,6 +20,44 @@ WEEKDAY_NAMES = {
     "saturday": 5,
     "sunday": 6,
 }
+MONTH_NAMES = {
+    name: month
+    for month, names in enumerate(
+        (
+            (),
+            ("january", "jan"),
+            ("february", "feb"),
+            ("march", "mar"),
+            ("april", "apr"),
+            ("may",),
+            ("june", "jun"),
+            ("july", "jul"),
+            ("august", "aug"),
+            ("september", "sep", "sept"),
+            ("october", "oct"),
+            ("november", "nov"),
+            ("december", "dec"),
+        )
+    )
+    for name in names
+}
+
+
+class DateNormalizationMethod(StrEnum):
+    EXPLICIT_ISO = "explicit_iso"
+    NAMED_MONTH = "named_month"
+    RELATIVE_DAY = "relative_day"
+    WEEKDAY = "weekday"
+    WEEKDAY_PERIOD = "weekday_period"
+    WEEKEND = "weekend"
+    RELATIVE_RANGE = "relative_range"
+    NONE = "none"
+
+
+@dataclass(frozen=True)
+class DateScopeResolution:
+    scope: str | None
+    method: DateNormalizationMethod
 
 
 def operating_timezone(name: str | None = None) -> ZoneInfo:
@@ -73,8 +113,8 @@ def _relative_weekday(
     return reference_date + timedelta(days=days_ahead)
 
 
-def resolve_date_scope(query: str, reference_date: date) -> str | None:
-    """Resolve supported calendar language to one ISO date or inclusive range."""
+def resolve_date_scope_details(query: str, reference_date: date) -> DateScopeResolution:
+    """Resolve calendar language and report the deterministic rule that matched."""
 
     normalized = query.casefold().replace("’", "'")
     iso_dates = re.findall(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)", normalized)
@@ -86,20 +126,55 @@ def resolve_date_scope(query: str, reference_date: date) -> str | None:
             continue
     if len(valid_iso_dates) == 2:
         start, end = sorted(valid_iso_dates)
-        return _date_range(start, end)
+        return DateScopeResolution(_date_range(start, end), DateNormalizationMethod.EXPLICIT_ISO)
     if len(valid_iso_dates) == 1:
-        return valid_iso_dates[0].isoformat()
+        return DateScopeResolution(
+            valid_iso_dates[0].isoformat(),
+            DateNormalizationMethod.EXPLICIT_ISO,
+        )
+
+    month_pattern = "|".join(sorted(MONTH_NAMES, key=len, reverse=True))
+    named_date = re.search(
+        rf"\b({month_pattern})\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(\d{{4}}))?\b",
+        normalized,
+    )
+    if named_date is not None:
+        month_name, day_value, year_value = named_date.groups()
+        try:
+            resolved = date(
+                int(year_value) if year_value else reference_date.year,
+                MONTH_NAMES[month_name],
+                int(day_value),
+            )
+        except ValueError:
+            pass
+        else:
+            if re.search(r"\bbefore\s+(?:the\s+)?$", normalized[: named_date.start()]):
+                resolved -= timedelta(days=1)
+            return DateScopeResolution(resolved.isoformat(), DateNormalizationMethod.NAMED_MONTH)
 
     if re.search(r"\bday after tomorrow\b", normalized):
-        return (reference_date + timedelta(days=2)).isoformat()
+        return DateScopeResolution(
+            (reference_date + timedelta(days=2)).isoformat(),
+            DateNormalizationMethod.RELATIVE_DAY,
+        )
     if re.search(r"\bday before yesterday\b", normalized):
-        return (reference_date - timedelta(days=2)).isoformat()
+        return DateScopeResolution(
+            (reference_date - timedelta(days=2)).isoformat(),
+            DateNormalizationMethod.RELATIVE_DAY,
+        )
     if re.search(r"\btomorrow\b", normalized):
-        return (reference_date + timedelta(days=1)).isoformat()
+        return DateScopeResolution(
+            (reference_date + timedelta(days=1)).isoformat(),
+            DateNormalizationMethod.RELATIVE_DAY,
+        )
     if re.search(r"\byesterday\b", normalized):
-        return (reference_date - timedelta(days=1)).isoformat()
+        return DateScopeResolution(
+            (reference_date - timedelta(days=1)).isoformat(),
+            DateNormalizationMethod.RELATIVE_DAY,
+        )
     if re.search(r"\btoday(?:'s)?\b", normalized):
-        return reference_date.isoformat()
+        return DateScopeResolution(reference_date.isoformat(), DateNormalizationMethod.RELATIVE_DAY)
 
     weekday_match = re.search(
         r"\b(?:(next|this|last)\s+)?"
@@ -108,27 +183,26 @@ def resolve_date_scope(query: str, reference_date: date) -> str | None:
     )
     if weekday_match is not None:
         modifier, weekday_name = weekday_match.groups()
-        return _relative_weekday(
-            reference_date,
-            WEEKDAY_NAMES[weekday_name],
-            modifier,
-        ).isoformat()
+        return DateScopeResolution(
+            _relative_weekday(reference_date, WEEKDAY_NAMES[weekday_name], modifier).isoformat(),
+            DateNormalizationMethod.WEEKDAY,
+        )
 
     if re.search(r"\b(?:last|previous)\s+weekday\b", normalized):
         candidate = reference_date - timedelta(days=1)
         while candidate.weekday() >= 5:
             candidate -= timedelta(days=1)
-        return candidate.isoformat()
+        return DateScopeResolution(candidate.isoformat(), DateNormalizationMethod.WEEKDAY)
     if re.search(r"\bnext\s+weekday\b", normalized):
         candidate = reference_date + timedelta(days=1)
         while candidate.weekday() >= 5:
             candidate += timedelta(days=1)
-        return candidate.isoformat()
+        return DateScopeResolution(candidate.isoformat(), DateNormalizationMethod.WEEKDAY)
     if re.search(r"\bthis\s+weekday\b", normalized):
         candidate = reference_date
         while candidate.weekday() >= 5:
             candidate += timedelta(days=1)
-        return candidate.isoformat()
+        return DateScopeResolution(candidate.isoformat(), DateNormalizationMethod.WEEKDAY)
 
     weekday_period = re.search(
         r"\b(?:(this|next|last)\s+(?:week(?:'s)?\s+)?)?weekdays\b",
@@ -138,7 +212,10 @@ def resolve_date_scope(query: str, reference_date: date) -> str | None:
         modifier = weekday_period.group(1)
         offset = 1 if modifier == "next" else -1 if modifier == "last" else 0
         monday = _week_start(reference_date, offset)
-        return _date_range(monday, monday + timedelta(days=4))
+        return DateScopeResolution(
+            _date_range(monday, monday + timedelta(days=4)),
+            DateNormalizationMethod.WEEKDAY_PERIOD,
+        )
 
     weekend_match = re.search(
         r"\b(?:(this|next|last)\s+)?weekends?\b",
@@ -148,20 +225,41 @@ def resolve_date_scope(query: str, reference_date: date) -> str | None:
         modifier = weekend_match.group(1)
         offset = 1 if modifier == "next" else -1 if modifier == "last" else 0
         saturday = _week_start(reference_date, offset) + timedelta(days=5)
-        return _date_range(saturday, saturday + timedelta(days=1))
+        return DateScopeResolution(
+            _date_range(saturday, saturday + timedelta(days=1)),
+            DateNormalizationMethod.WEEKEND,
+        )
 
     next_days = re.search(r"\bnext\s+(\d{1,2})\s+days?\b", normalized)
     if next_days is not None:
         days = int(next_days.group(1))
         if days > 0:
-            return _date_range(reference_date, reference_date + timedelta(days=days))
+            return DateScopeResolution(
+                _date_range(reference_date, reference_date + timedelta(days=days)),
+                DateNormalizationMethod.RELATIVE_RANGE,
+            )
 
     if re.search(r"\bnext week\b", normalized):
         next_monday = _week_start(reference_date, 1)
-        return _date_range(next_monday, next_monday + timedelta(days=6))
+        return DateScopeResolution(
+            _date_range(next_monday, next_monday + timedelta(days=6)),
+            DateNormalizationMethod.RELATIVE_RANGE,
+        )
     if re.search(r"\bthis week\b", normalized):
         this_sunday = _week_start(reference_date) + timedelta(days=6)
-        return _date_range(reference_date, this_sunday)
+        return DateScopeResolution(
+            _date_range(reference_date, this_sunday),
+            DateNormalizationMethod.RELATIVE_RANGE,
+        )
     if re.search(r"\bupcoming\b", normalized):
-        return _date_range(reference_date, reference_date + timedelta(days=7))
-    return None
+        return DateScopeResolution(
+            _date_range(reference_date, reference_date + timedelta(days=7)),
+            DateNormalizationMethod.RELATIVE_RANGE,
+        )
+    return DateScopeResolution(None, DateNormalizationMethod.NONE)
+
+
+def resolve_date_scope(query: str, reference_date: date) -> str | None:
+    """Resolve supported calendar language to one ISO date or inclusive range."""
+
+    return resolve_date_scope_details(query, reference_date).scope

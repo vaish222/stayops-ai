@@ -161,7 +161,17 @@ StayOps is built as a stateful LangGraph workflow rather than a single LLM call.
 
 ```
 
-The four specialist nodes fan out from the context loader and run in parallel when selected; maintenance is not downstream of the other specialists. The Streamlit approval UI currently exposes per-action **Approve** and **Reject** controls. The backend human-review contract also supports **Edit → Reconfirm** for programmatic callers, but that control is not exposed in the current UI.
+The request router also derives a deterministic normalized operation. That
+sub-intent selects the smallest useful specialist set: booking lookups use
+Booking, cleaner status uses Turnover, timing uses Booking + Turnover, property
+readiness uses Booking + Turnover + Maintenance, and broad briefings use all
+four. Selected specialists fan out from the context loader and run in parallel;
+maintenance is not downstream of another specialist.
+
+Read-only recommendations remain autonomous. Only explicit write intent opens
+the Streamlit approval UI, which exposes per-action **Approve** and **Reject**
+controls. The backend human-review contract also supports **Edit → Reconfirm**
+for programmatic callers, but that control is not exposed in the current UI.
 
 Every approved write receives a one-time capability bound to the exact request, action, parameters, and write tool. Reusing the capability or changing the reviewed action causes the simulated write to be rejected.
 
@@ -207,11 +217,15 @@ Continue    ▼
               Deterministic safety gate
                          │
                          ▼
-            Human review / acknowledgement
+             Non-blocking warning in answer
 
 ```
 
-Unavailable source data is never treated as an all-clear. Persistent read failures and synthesis failures remain visible in graph state and require human review or acknowledgement before the workflow completes.
+Unavailable source data is never treated as an all-clear. Persistent read
+failures, synthesis failures, low confidence, conflicts, and severe maintenance
+remain visible as operational warnings without opening write approval. Explicit
+write requests still require human approval, and the protected tools continue to
+reject any execution without a valid one-time approval capability.
 
 ---
 
@@ -352,11 +366,10 @@ expected-versus-actual baseline, and saves its run and trace identifiers to
 `evaluation/results/langsmith/stay_001_baseline.json`. LangGraph nodes appear as
 child runs, and each read-tool attempt is recorded as a child tool span.
 
-STAY-001 is expected to expose a current baseline mismatch: the exact phrase
-`checking in` falls back to `general_operations`, activates all four specialists,
-and can pause for human review. The runner reports these differences without
-changing the query or modifying graph output. This is deliberate; router and
-specialist improvements belong to a later post-baseline pass.
+The saved STAY-001 artifact records the original baseline mismatch. The current
+implementation now recognizes `checking in`, activates only Booking, and keeps
+the read-only request out of human approval. The frozen baseline remains
+available for comparison with the post-improvement run.
 
 ### Run the Week 4 golden-dataset baseline
 
@@ -398,6 +411,21 @@ a raw failed-case inventory. Required-fact accuracy, specialist and tool
 trajectory, HITL accuracy, failure recovery, latency, unauthorized writes, and
 unsupported critical claims remain separate metrics; the runner does not
 produce one opaque quality score.
+
+Run the H1–H4 post-improvement evaluation without changing the frozen dataset
+or scoring rules:
+
+```bash
+set -a
+source .env
+set +a
+uv run python -m src.evaluation.golden_runner \
+  --run-version improved-v1 \
+  --output-dir evaluation/results/improved-v1
+```
+
+The improved summary and baseline comparison are in
+[`evaluation/results/improved-v1/`](evaluation/results/improved-v1/).
 
 ## LLM Synthesizer Comparison
 

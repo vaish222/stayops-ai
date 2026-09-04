@@ -109,6 +109,11 @@ def render_failure_app() -> AppTest:
     return app.run()
 
 
+def submit_question(app: AppTest, query: str) -> AppTest:
+    app.text_input[0].input(query)
+    return app.button(key="FormSubmitter:ask_stayops-Ask StayOps").click().run()
+
+
 def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     app = render_app()
 
@@ -145,50 +150,24 @@ def test_dashboard_renders_metrics_portfolio_and_review_controls() -> None:
     ]
     assert {button.label for button in app.button} >= {
         "Ask StayOps",
-        "Approve & Send",
-        "Reject",
         "What's urgent today?",
         "Who's checking in?",
         "Cleaning risks",
         "Guests needing replies",
     }
-    assert page_markup.count("Your approval is needed") == 1
-    assert "StayOps found actions it cannot take without you." in page_markup
-    assert "Nothing is sent or changed until you approve." in page_markup
-    assert "Why now" in page_markup
-    assert "Approval required" in page_markup
-    assert "Contact cleaner" in page_markup
-    assert "Same-day turnover has a missing cleaner confirmation." in page_markup
-    assert (
-        "Approval is required because this action sends a message to the cleaner."
-        in page_markup
-    )
-    assert "Proposed message" in page_markup
-    assert (
-        "Please confirm whether the scheduled turnover will be completed by the target time."
-        in page_markup
-    )
-    assert "Update maintenance status" in page_markup
-    assert "Proposed change" in page_markup
-    assert "Maintenance status" in page_markup
-    assert "Open" in page_markup
-    assert "In Progress" in page_markup
-    controller = app.session_state["stayops_controller"]
-    expected_property_groups = len(
-        _group_approval_actions(controller.pending_review["proposed_actions"])
-    )
+    assert "Your approval is needed" not in page_markup
+    assert "Approve & Send" not in {button.label for button in app.button}
+    assert "Reject" not in {button.label for button in app.button}
     approval_headers = [
         item.value
         for item in app.markdown
         if item.value.startswith('<div class="approval-property-header">')
     ]
-    assert len(approval_headers) == expected_property_groups
-    assert any("2 actions need your approval" in header for header in approval_headers)
-    assert {expander.label for expander in app.expander} >= {"View source details"}
+    assert approval_headers == []
     assert "Why StayOps suggested this" not in {
         expander.label for expander in app.expander
     }
-    assert sum("Simulation mode:" in item.value for item in app.caption) == 1
+    assert sum("Simulation mode:" in item.value for item in app.caption) == 0
     assert "Edit" not in {button.label for button in app.button}
     assert len(app.text_area) == 0
 
@@ -220,8 +199,7 @@ def test_dashboard_date_selector_labels_every_date_bound_section() -> None:
         for item in app.markdown
         if item.value.startswith('<div class="approval-property-header">')
     ]
-    assert approval_headers
-    assert all("Today · Aug 28" in header for header in approval_headers)
+    assert approval_headers == []
 
 
 def test_next_today_and_calendar_controls_refresh_dashboard_scope() -> None:
@@ -632,7 +610,7 @@ def test_agent_activity_rail_exposes_completed_execution_steps() -> None:
     assert "Operations Synthesizer" in page_markup
     assert "Safety Gate" in page_markup
     assert "Completed" in page_markup
-    assert "Waiting for your approval" in page_markup
+    assert "No approval needed" in page_markup
     assert "Developer details" in {expander.label for expander in app.expander}
     assert "Structured run details" not in "\n".join(
         item.value for item in app.markdown
@@ -682,6 +660,7 @@ def test_operations_tables_use_human_readable_values() -> None:
 
 def test_approve_executes_the_reviewed_action_without_edit_control() -> None:
     app = render_app()
+    app = submit_question(app, "Handle every issue that needs attention today.")
     controller = app.session_state["stayops_controller"]
     initial_action_count = len(controller.pending_review["proposed_actions"])
     reviewed_message = controller.pending_review["proposed_actions"][0]["description"]
@@ -710,6 +689,7 @@ def test_approve_executes_the_reviewed_action_without_edit_control() -> None:
 
 def test_approve_update_executes_the_visible_status_transition() -> None:
     app = render_app()
+    app = submit_question(app, "Handle every issue that needs attention today.")
     controller = app.session_state["stayops_controller"]
     update_action = next(
         action
@@ -736,6 +716,7 @@ def test_approve_update_executes_the_visible_status_transition() -> None:
 
 def test_reject_control_records_decision_without_execution() -> None:
     app = render_app()
+    app = submit_question(app, "Handle every issue that needs attention today.")
 
     app = next(button for button in app.button if button.label == "Reject").click().run()
 
@@ -747,26 +728,22 @@ def test_reject_control_records_decision_without_execution() -> None:
     assert any("Action rejected — nothing was sent" in item.value for item in app.info)
     page_markup = "\n".join(item.value for item in app.markdown)
     assert "Action rejected · no write made" in page_markup
-    assert "✨ StayOps Answer" not in page_markup
+    assert "✨ StayOps Answer" in page_markup
 
 
-def test_source_failure_is_prominent_and_requires_acknowledgement() -> None:
+def test_source_failure_is_prominent_without_opening_approval() -> None:
     app = render_failure_app()
 
     assert app.exception == []
     assert any("Analysis incomplete" in item.value for item in app.error)
     assert any("findings are partial" in item.value.lower() for item in app.error)
-    assert "Acknowledge" in {button.label for button in app.button}
+    assert "Acknowledge" not in {button.label for button in app.button}
     page_markup = "\n".join(item.value for item in app.markdown)
     assert "✨ StayOps Answer" not in page_markup
     assert '<div class="value">0</div><div class="label">Needs Action</div>' in page_markup
     assert '<div class="value">8</div><div class="label">Watch</div>' in page_markup
     assert '<div class="value">0</div><div class="label">Ready for Guests</div>' in page_markup
 
-    app = next(
-        button for button in app.button if button.label == "Acknowledge"
-    ).click().run()
-
     controller = app.session_state["stayops_controller"]
+    assert controller.pending_review is None
     assert controller.result["executed_actions"] == []
-    assert any("No simulated action was executed" in item.value for item in app.success)

@@ -24,7 +24,7 @@
     "scenario_id": "same_day_turnover",
     "name": "Confirmed same-day turnover remains on watch",
     "category": "same_day_turnover",
-    "query": "What turnovers are scheduled at City Loft today?",
+    "query": "Is City Loft turnover ready for today's arrival?",
     "expected_route": {
       "intent": "turnover_operations",
       "property_scope": ["prop_city_loft"],
@@ -52,14 +52,14 @@
       "date_scope": "2026-08-28",
       "write_requested": false
     },
-    "expected_specialists": ["booking", "turnover"],
+    "expected_specialists": ["turnover"],
     "expected_status": "needs_attention",
-    "required_categories": ["same_day_turnover", "cleaner_confirmation_missing"],
-    "expected_requires_review": true,
-    "expected_review_reasons": ["message_send"],
+    "required_categories": ["cleaner_confirmation_missing"],
+    "expected_requires_review": false,
+    "expected_review_reasons": [],
     "failure_plan": {},
     "failure_expectation": "not_applicable",
-    "write_expectation": "pause_without_execution",
+    "write_expectation": "no_write",
     "inject_conflict": false
   },
   {
@@ -76,18 +76,18 @@
     "expected_specialists": ["guest"],
     "expected_status": "needs_attention",
     "required_categories": ["guest_maintenance_report"],
-    "expected_requires_review": true,
-    "expected_review_reasons": ["message_send"],
+    "expected_requires_review": false,
+    "expected_review_reasons": [],
     "failure_plan": {},
     "failure_expectation": "not_applicable",
-    "write_expectation": "pause_without_execution",
+    "write_expectation": "no_write",
     "inject_conflict": false
   },
   {
     "scenario_id": "conflicting_findings",
     "name": "Contradictory turnover findings trigger review",
     "category": "conflicting_findings",
-    "query": "What turnovers are scheduled at Lake House today?",
+    "query": "Is Lake House turnover ready for today's arrival?",
     "expected_route": {
       "intent": "turnover_operations",
       "property_scope": ["prop_lake_house"],
@@ -97,11 +97,11 @@
     "expected_specialists": ["booking", "turnover"],
     "expected_status": "needs_attention",
     "required_categories": ["turnover_timing_risk", "turnover_on_track"],
-    "expected_requires_review": true,
-    "expected_review_reasons": ["conflicting_findings"],
+    "expected_requires_review": false,
+    "expected_review_reasons": [],
     "failure_plan": {},
     "failure_expectation": "not_applicable",
-    "write_expectation": "pause_without_execution",
+    "write_expectation": "no_write",
     "inject_conflict": true
   },
   {
@@ -118,11 +118,11 @@
     "expected_specialists": ["guest"],
     "expected_status": "needs_attention",
     "required_categories": ["guest_maintenance_report"],
-    "expected_requires_review": true,
-    "expected_review_reasons": ["message_send"],
+    "expected_requires_review": false,
+    "expected_review_reasons": [],
     "failure_plan": {"get_guest_messages": 1},
     "failure_expectation": "retry_recovers",
-    "write_expectation": "pause_without_execution",
+    "write_expectation": "no_write",
     "inject_conflict": false
   },
   {
@@ -139,13 +139,11 @@
     "expected_specialists": ["guest"],
     "expected_status": "no_findings",
     "required_categories": [],
-    "expected_requires_review": true,
-    "expected_review_reasons": [
-      "source_data_unavailable"
-    ],
+    "expected_requires_review": false,
+    "expected_review_reasons": [],
     "failure_plan": {"get_guest_messages": 2},
     "failure_expectation": "safe_escalation",
-    "write_expectation": "pause_without_execution",
+    "write_expectation": "no_write",
     "inject_conflict": false
   },
   {
@@ -168,18 +166,18 @@
     "scenario_id": "approved_write",
     "name": "Reviewed cleaner message executes after explicit approval",
     "category": "approved_write",
-    "query": "Is the cleaner confirmed at Lake House today?",
+    "query": "Send the cleaner at Lake House a reminder today.",
     "expected_route": {
       "intent": "turnover_operations",
       "property_scope": ["prop_lake_house"],
       "date_scope": "2026-08-28",
-      "write_requested": false
+      "write_requested": true
     },
-    "expected_specialists": ["booking", "turnover"],
+    "expected_specialists": ["turnover"],
     "expected_status": "needs_attention",
-    "required_categories": ["same_day_turnover", "cleaner_confirmation_missing"],
+    "required_categories": ["cleaner_confirmation_missing"],
     "expected_requires_review": true,
-    "expected_review_reasons": ["message_send"],
+    "expected_review_reasons": ["write_requested", "message_send"],
     "failure_plan": {},
     "failure_expectation": "not_applicable",
     "write_expectation": "approved_execution",

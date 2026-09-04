@@ -39,6 +39,9 @@ class StayOpsState(TypedDict):
     request_id: str
     host_query: str
     intent: str
+    normalized_operation: str
+    readiness_detected: bool
+    date_normalization_method: str
     property_scope: list[str]
     date_scope: str | None
     write_requested: bool
@@ -64,6 +67,7 @@ class StayOpsState(TypedDict):
     action_proposed: bool
     requires_human_review: bool
     review_reasons: list[dict[str, Any]]
+    operational_warnings: list[dict[str, Any]]
     risk_gate_evaluated: bool
     human_decision: dict[str, Any] | None
     approval_grants: list[dict[str, Any]]
@@ -83,6 +87,9 @@ def create_initial_state(host_query: str, request_id: str | None = None) -> Stay
         request_id=request_id or str(uuid4()),
         host_query=host_query,
         intent="",
+        normalized_operation="general",
+        readiness_detected=False,
+        date_normalization_method="none",
         property_scope=[],
         date_scope=None,
         write_requested=False,
@@ -108,6 +115,7 @@ def create_initial_state(host_query: str, request_id: str | None = None) -> Stay
         action_proposed=False,
         requires_human_review=False,
         review_reasons=[],
+        operational_warnings=[],
         risk_gate_evaluated=False,
         human_decision=None,
         approval_grants=[],

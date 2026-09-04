@@ -7,6 +7,7 @@ from src.models import (
     FindingCategory,
     FindingSeverity,
     HumanReviewReason,
+    OperationalWarning,
     ReviewReasonCode,
     RiskGateConfig,
     RiskGateInput,
@@ -72,26 +73,27 @@ class RiskActionGate:
             else RiskGateInput.model_validate(payload)
         )
         reasons: list[HumanReviewReason] = []
+        advisories: list[OperationalWarning] = []
 
         if context.unavailable_sources:
-            reasons.append(
-                HumanReviewReason(
+            advisories.append(
+                OperationalWarning(
                     code=ReviewReasonCode.SOURCE_DATA_UNAVAILABLE,
                     message=(
                         "Required source data remained unavailable after retry. "
-                        "The findings are partial and require human review."
+                        "The findings are partial and must not be treated as an all-clear."
                     ),
                     source_ids=context.unavailable_sources,
                 )
             )
 
         if not context.synthesis_complete:
-            reasons.append(
-                HumanReviewReason(
+            advisories.append(
+                OperationalWarning(
                     code=ReviewReasonCode.SYNTHESIS_UNAVAILABLE,
                     message=(
-                        "Operations synthesis could not be completed; human "
-                        "review is required before continuing."
+                        "Operations synthesis could not be completed; the result "
+                        "is incomplete."
                     ),
                     source_ids=["operations_synthesizer"],
                 )
@@ -109,19 +111,22 @@ class RiskActionGate:
                 )
             )
 
-        for action in context.proposed_actions:
-            rule = ACTION_REVIEW_RULES.get(action.action_type)
-            if rule is None:
-                continue
-            code, message = rule
-            reasons.append(
-                HumanReviewReason(
-                    code=code,
-                    message=message,
-                    source_ids=[action.action_id, *action.source_finding_ids],
-                    property_ids=[action.property_id],
+        # Synthesized actions are recommendations for read-only questions.  They
+        # become approval candidates only when the router detected write intent.
+        if context.write_requested:
+            for action in context.proposed_actions:
+                rule = ACTION_REVIEW_RULES.get(action.action_type)
+                if rule is None:
+                    continue
+                code, message = rule
+                reasons.append(
+                    HumanReviewReason(
+                        code=code,
+                        message=message,
+                        source_ids=[action.action_id, *action.source_finding_ids],
+                        property_ids=[action.property_id],
+                    )
                 )
-            )
 
         for finding in context.specialist_findings:
             if (
@@ -129,11 +134,11 @@ class RiskActionGate:
                 and finding.severity
                 in {FindingSeverity.HIGH, FindingSeverity.CRITICAL}
             ):
-                reasons.append(
-                    HumanReviewReason(
+                advisories.append(
+                    OperationalWarning(
                         code=ReviewReasonCode.HIGH_MAINTENANCE_SEVERITY,
                         message=(
-                            "High- or critical-severity maintenance requires human review."
+                            "High- or critical-severity maintenance needs prompt attention."
                         ),
                         source_ids=[finding.finding_id],
                         property_ids=[finding.property_id],
@@ -144,12 +149,12 @@ class RiskActionGate:
         for finding in context.prioritized_findings:
             if finding.confidence < self.config.low_confidence_threshold:
                 covered_low_confidence_ids.update(finding.source_finding_ids)
-                reasons.append(
-                    HumanReviewReason(
+                advisories.append(
+                    OperationalWarning(
                         code=ReviewReasonCode.LOW_CONFIDENCE,
                         message=(
                             f"Finding confidence {finding.confidence:.2f} is below the "
-                            f"{self.config.low_confidence_threshold:.2f} review threshold."
+                            f"{self.config.low_confidence_threshold:.2f} confidence threshold."
                         ),
                         source_ids=finding.source_finding_ids,
                         property_ids=[finding.property_id],
@@ -160,29 +165,30 @@ class RiskActionGate:
                 finding.confidence < self.config.low_confidence_threshold
                 and finding.finding_id not in covered_low_confidence_ids
             ):
-                reasons.append(
-                    HumanReviewReason(
+                advisories.append(
+                    OperationalWarning(
                         code=ReviewReasonCode.LOW_CONFIDENCE,
                         message=(
                             f"Finding confidence {finding.confidence:.2f} is below the "
-                            f"{self.config.low_confidence_threshold:.2f} review threshold."
+                            f"{self.config.low_confidence_threshold:.2f} confidence threshold."
                         ),
                         source_ids=[finding.finding_id],
                         property_ids=[finding.property_id],
                     )
                 )
 
-        reasons.extend(self._conflict_reasons(context.specialist_findings))
+        advisories.extend(self._conflict_warnings(context.specialist_findings))
         return RiskGateOutput(
             requires_human_review=bool(reasons),
             reasons=reasons,
+            advisories=advisories,
         )
 
     @staticmethod
-    def _conflict_reasons(
+    def _conflict_warnings(
         findings: list[SpecialistFinding],
-    ) -> list[HumanReviewReason]:
-        reasons: list[HumanReviewReason] = []
+    ) -> list[OperationalWarning]:
+        warnings: list[OperationalWarning] = []
         ordered = sorted(findings, key=lambda finding: finding.finding_id)
         for index, left in enumerate(ordered):
             for right in ordered[index + 1 :]:
@@ -192,8 +198,8 @@ class RiskActionGate:
                     continue
                 if not RiskActionGate._evidence_ids(left) & RiskActionGate._evidence_ids(right):
                     continue
-                reasons.append(
-                    HumanReviewReason(
+                warnings.append(
+                    OperationalWarning(
                         code=ReviewReasonCode.CONFLICTING_FINDINGS,
                         message=(
                             "Specialist findings make conflicting claims about the same "
@@ -203,7 +209,7 @@ class RiskActionGate:
                         property_ids=[left.property_id],
                     )
                 )
-        return reasons
+        return warnings
 
     @staticmethod
     def _evidence_ids(finding: SpecialistFinding) -> set[str]:

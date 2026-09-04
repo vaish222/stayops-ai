@@ -15,8 +15,10 @@ from src.agents import (
     GuestAgent,
     MaintenanceAgent,
     RequestIntent,
+    RequestOperation,
     RequestRouter,
     TurnoverAgent,
+    specialists_for_operation,
 )
 from src.models import SpecialistName, SpecialistOutput
 from src.observability import trace_read_tool_call
@@ -64,7 +66,6 @@ SPECIALIST_SOURCE_TOOLS = {
         ReadToolName.GET_PROPERTY_RULES,
     },
     SpecialistName.MAINTENANCE: {
-        ReadToolName.GET_RESERVATIONS,
         ReadToolName.GET_MAINTENANCE_TICKETS,
     },
 }
@@ -77,8 +78,14 @@ ALL_SPECIALISTS = [
 ]
 
 
-def select_specialists(intent: str) -> list[SpecialistName]:
-    """Select the smallest useful specialist set for a routed intent."""
+def select_specialists(
+    intent: str,
+    normalized_operation: str | None = None,
+) -> list[SpecialistName]:
+    """Select specialists using H2/H4 operation policy with legacy fallback."""
+
+    if normalized_operation:
+        return specialists_for_operation(normalized_operation)
 
     if intent in {
         RequestIntent.DAILY_BRIEFING.value,
@@ -164,7 +171,10 @@ def load_context_node(
 ) -> dict[str, Any]:
     """Load needed sources independently; retry retryable failures once."""
 
-    selected = select_specialists(state["intent"])
+    selected = select_specialists(
+        state["intent"],
+        state.get("normalized_operation", RequestOperation.GENERAL.value),
+    )
     needed_tools = {ReadToolName.GET_PROPERTIES}
     for specialist in selected:
         needed_tools.update(SPECIALIST_SOURCE_TOOLS[specialist])

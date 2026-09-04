@@ -130,6 +130,7 @@ def test_property_summary_uses_highest_priority_attention_finding() -> None:
 def test_review_action_maps_only_to_its_supporting_evidence() -> None:
     controller = deterministic_controller()
     controller.load_daily_briefing()
+    controller.run_query("Send the cleaner at Lake House a message today.")
     request = controller.pending_review
     assert request is not None
     action = next(
@@ -220,6 +221,7 @@ def test_user_query_stream_reports_live_activity_and_final_state() -> None:
 def test_controller_resumes_approval_on_same_thread_and_exposes_execution() -> None:
     controller = deterministic_controller()
     controller.load_daily_briefing()
+    controller.run_query("Send the cleaner at Lake House a message today.")
     request = controller.pending_review
     assert request is not None
     action = next(
@@ -233,16 +235,14 @@ def test_controller_resumes_approval_on_same_thread_and_exposes_execution() -> N
         action_id=action["action_id"],
     )
 
-    assert controller.thread_id == "dashboard-daily"
-    assert controller.pending_review is not None
-    assert len(controller.pending_review["proposed_actions"]) == (
-        len(request["proposed_actions"]) - 1
-    )
+    assert controller.thread_id == "dashboard-query"
+    assert controller.pending_review is None
     assert completed["human_decision"]["decision"] == "approve"
     assert completed["executed_actions"][0]["tool_name"] == (
         WriteToolName.SEND_CLEANER_MESSAGE
     )
-    assert controller.daily_result == completed
+    assert controller.result == completed
+    assert controller.daily_result is not completed
 
 
 def test_incomplete_analysis_message_names_sources_and_rejects_false_all_clear() -> None:
